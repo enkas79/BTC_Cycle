@@ -31,7 +31,7 @@ class VWindow:
     label: str
     start: date
     end: date
-    kind: str  # window | bottom
+    kind: str  # window | bottom | exit | peak
 
 
 @dataclass
@@ -40,6 +40,8 @@ class ChartOverlays:
     windows: List[VWindow] = field(default_factory=list)
     fair_curve: List[Tuple[date, float]] = field(default_factory=list)
     floor_curve: List[Tuple[date, float]] = field(default_factory=list)
+    exits: List[VWindow] = field(default_factory=list)  # uscite programmate e finestra di picco
+    exit_levels: List[HLevel] = field(default_factory=list)  # obiettivo di picco dichiarato
 
 
 def _k(v: float) -> str:
@@ -62,6 +64,14 @@ def build_overlays(plan: Plan, start: date, end: date, step_days: int = 7) -> Ch
         out.windows.append(VWindow(tr("Finestra di minimo"), s["window_start"], s["window_end"], "window"))
     if s.get("est_bottom"):
         out.windows.append(VWindow(tr("Minimo stimato"), s["est_bottom"], s["est_bottom"], "bottom"))
+    for x in plan.exit_steps:
+        label = tr("Vendi {pct}% · resta {rem:.0f}%").format(pct=x["sell_pct"], rem=x["remaining"])
+        out.exits.append(VWindow(label, x["date"], x["date"], "exit"))
+    if s.get("peak_window"):
+        out.exits.append(VWindow(tr("Finestra di picco"), s["peak_window"][0], s["peak_window"][1], "peak"))
+    for t in plan.scenarios.get("target", []):
+        out.exit_levels.append(HLevel(tr("Obiettivo di picco · {p}").format(p=_k(t["price"])),
+                                      t["price"], t["price"], "target"))
     pl = s.get("power_law")
     if pl:
         d = start

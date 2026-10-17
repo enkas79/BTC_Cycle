@@ -44,7 +44,9 @@ di oggi, come indicato dal documento sorgente.</li>
 fair value e floor della power law, livelli di invalidazione, MA200 e finestra di minimo. La
 casella permette di passare tra scala lineare e logaritmica. Con il click sinistro su un punto
 traccia le linee di prezzo e data (l'etichetta mostra lo scarto dal prezzo attuale); con il click
-destro le rimuove.</p>
+destro le rimuove. <b>Mostra uscite</b> estende il grafico fino alle vendite programmate (date,
+percentuali, finestra di picco e obiettivo dichiarato). <b>Esporta immagine…</b> e <b>Copia</b>
+salvano o copiano il grafico (con stato e fonti) in PNG per condividerlo.</p>
 
 <h3>5. Leggi le avvertenze</h3>
 <p>La sezione <b>Avvertenze</b> segnala fonti uniche, contenuti promozionali, stime divergenti,

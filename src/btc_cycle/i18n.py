@@ -126,7 +126,9 @@ as stated in the source document.</li>
 <p>The <b>Chart</b> tab shows the BTC price (refreshed every 60 s) with the ladder bands, the power-law
 fair value and floor, invalidation levels, MA200 and the bottom window. Use the checkbox to switch
 between linear and logarithmic scale. Left-click a point to draw its price and date lines (the label
-shows the difference from the current price); right-click removes them.</p>
+shows the difference from the current price); right-click removes them. <b>Show exits</b> extends the chart to the scheduled sales (dates,
+percentages, peak window and stated target). <b>Export image…</b> and <b>Copy</b> save or copy the
+chart (with status and sources) as a PNG for sharing.</p>
 
 <h3>5. Read the warnings</h3>
 <p>The <b>Warnings</b> section flags single sources, promotional content, diverging estimates, small

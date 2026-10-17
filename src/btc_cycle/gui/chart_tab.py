@@ -9,7 +9,17 @@ from typing import Callable, List, Optional, Tuple
 import pyqtgraph as pg
 from PyQt6.QtCore import QSettings, QTimer
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..core.chart import FAILED_RALLY_MEDIAN_PCT, build_overlays, nearest_zone, rally_from_low
 from ..core.market import fetch_history, fetch_spot
@@ -68,15 +78,31 @@ class ChartTab(QWidget):
         self.log_box = QCheckBox(tr("Scala logaritmica"))
         self.log_box.setChecked(str(QSettings("enkas79", "BTC_Cycle").value("chart_log", "false")) == "true")
         self.log_box.toggled.connect(self._toggle_log)
+        self.exit_box = QCheckBox(tr("Mostra uscite"))
+        saved = QSettings("enkas79", "BTC_Cycle").value("chart_exits", "false")
+        self.exit_box.setChecked(str(saved) == "true")
+        self.exit_box.toggled.connect(self._toggle_exits)
+        save = QPushButton(tr("Esporta immagine…"))
+        save.clicked.connect(self.export_image)
+        copy = QPushButton(tr("Copia"))
+        copy.clicked.connect(self.copy_image)
         top = QHBoxLayout()
-        top.addWidget(self.info, 1)
-        top.addWidget(self.log_box)
-        top.addWidget(reset)
-        top.addWidget(refresh)
+        for w in (self.log_box, self.exit_box):
+            top.addWidget(w)
+        top.addStretch(1)
+        for w in (reset, refresh, save, copy):
+            top.addWidget(w)
+        # L'immagine esportata è solo la "tela": stato, grafico e fonti, senza i pulsanti
+        self.canvas = QWidget()
+        self.canvas.setAutoFillBackground(True)
+        self.canvas.setStyleSheet("background: #ffffff;")
+        inner = QVBoxLayout(self.canvas)
+        inner.addWidget(self.info)
+        inner.addWidget(self.plot, 1)
+        inner.addWidget(self.sources)
         layout = QVBoxLayout(self)
         layout.addLayout(top)
-        layout.addWidget(self.plot, 1)
-        layout.addWidget(self.sources)
+        layout.addWidget(self.canvas, 1)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
@@ -159,6 +185,23 @@ class ChartTab(QWidget):
             return
         self._redraw(reset_view=False)
 
+    def _draw_exits(self, ov, ymax: float) -> None:
+        red = "#b71c1c"
+        for w in ov.exits:
+            if w.kind == "peak":
+                self.plot.addItem(pg.LinearRegionItem((_ts(w.start), _ts(w.end)), orientation="vertical",
+                                                      movable=False, brush=pg.mkBrush("#c6282826"),
+                                                      pen=_pen(red)), ignoreBounds=True)
+                self._label(w.label, _ts(w.start), ymax * 0.78, red)
+            else:
+                self.plot.addItem(pg.InfiniteLine(_ts(w.start), angle=90, pen=_pen(red, 2, True)),
+                                  ignoreBounds=True)
+                self._label(w.label, _ts(w.start), ymax * 0.45, red, angle=90)
+        for lv in ov.exit_levels:
+            self.plot.addItem(pg.InfiniteLine(self._y(lv.high), angle=0, pen=_pen(red, 1, True)),
+                              ignoreBounds=True)
+            self._label(lv.label, self.plot.getPlotItem().vb.viewRange()[0][1], lv.high, red, right=True)
+
     def _draw_click(self) -> None:
         x, price = self._click
         pen = _pen("#6a1b9a", 1, dash=True)
@@ -170,6 +213,20 @@ class ChartTab(QWidget):
         x_min, x_max = self.plot.getPlotItem().vb.viewRange()[0]
         self._label(text, x, price, "#6a1b9a", right=x > (x_min + x_max) / 2)
 
+    def _toggle_exits(self, checked: bool) -> None:
+        QSettings("enkas79", "BTC_Cycle").setValue("chart_exits", checked)
+        self._redraw(reset_view=True)
+
+    def export_image(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(self, tr("Esporta immagine…"),
+                                              f"btc_chart_{date.today():%Y%m%d}.png", "PNG (*.png)")
+        if path and not self.canvas.grab().save(path, "PNG"):
+            QMessageBox.warning(self, tr("Esporta"), tr("Impossibile salvare: {e}").format(e=path))
+
+    def copy_image(self) -> None:
+        QApplication.clipboard().setPixmap(self.canvas.grab())
+        self.info.setToolTip(tr("Grafico copiato negli appunti."))
+
     def _y(self, v: float) -> float:
         """Le posizioni degli oggetti del grafico sono in log10 quando la scala è logaritmica."""
         return math.log10(v) if self.log_box.isChecked() else v
@@ -178,8 +235,9 @@ class ChartTab(QWidget):
         QSettings("enkas79", "BTC_Cycle").setValue("chart_log", checked)
         self._redraw(reset_view=True)
 
-    def _label(self, text: str, x: float, y: float, color: str, right: bool = False) -> None:
-        item = pg.TextItem(text, color=color, anchor=(1 if right else 0, 1))
+    def _label(self, text: str, x: float, y: float, color: str, right: bool = False,
+               angle: float = 0) -> None:
+        item = pg.TextItem(text, color=color, anchor=(1 if right else 0, 1), angle=angle)
         item.setPos(x, self._y(y))
         self.plot.addItem(item, ignoreBounds=True)
 
@@ -192,15 +250,18 @@ class ChartTab(QWidget):
         plot.setLogMode(x=False, y=self.log_box.isChecked())
         xs, ys = [h[0] for h in self.history], [h[1] for h in self.history]
         today = date.today()
-        x_end = _ts(today + timedelta(days=FUTURE_DAYS))
+        show_exits = bool(self.plan and self.plan.exit_steps and self.exit_box.isChecked())
+        end_date = today + timedelta(days=FUTURE_DAYS)
+        if show_exits:
+            end_date = max(end_date, max(x["date"] for x in self.plan.exit_steps) + timedelta(days=90))
+        x_end = _ts(end_date)
         x0 = xs[0]
         plot.addItem(pg.PlotDataItem(xs, ys, pen=_pen(INK, 2)), ignoreBounds=True)
         lows = list(ys)
         highs = list(ys)
 
         if self.plan:
-            ov = build_overlays(self.plan, datetime.fromtimestamp(x0).date(),
-                                today + timedelta(days=FUTURE_DAYS))
+            ov = build_overlays(self.plan, datetime.fromtimestamp(x0).date(), end_date)
             now_pt = min(range(len(ov.fair_curve)), key=lambda i: abs(ov.fair_curve[i][0] - today),
                          default=None) if ov.fair_curve else None
             if now_pt is not None:  # la vista deve contenere fair value e floor di oggi
@@ -208,6 +269,8 @@ class ChartTab(QWidget):
                 lows.append(ov.floor_curve[now_pt][1])
             lows += [lv.low for lv in ov.levels if lv.low > 0]
             highs += [lv.high for lv in ov.levels]
+            if show_exits:
+                highs += [lv.high for lv in ov.exit_levels]
             ymin, ymax = min(lows) * 0.85, max(highs) * 1.1
             for name, curve, color in ((tr("Fair value power law"), ov.fair_curve, LEVEL_COLORS["fair"]),
                                        (tr("Floor power law"), ov.floor_curve, LEVEL_COLORS["floor"])):
@@ -225,8 +288,10 @@ class ChartTab(QWidget):
                     plot.addItem(pg.LinearRegionItem((_ts(w.start), _ts(w.end)), orientation="vertical",
                                                      movable=False, brush=brush, pen=_pen(ACCENT_DARK)),
                                  ignoreBounds=True)
-                self._label(w.label, _ts(w.start), ymax * 0.9, ACCENT_DARK)
+                self._label(w.label, _ts(w.start), ymax * (0.82 if w.kind == "bottom" else 0.9), ACCENT_DARK)
             floor_y = ymin
+            if show_exits:
+                self._draw_exits(ov, ymax)
             for lv in ov.levels:
                 if lv.kind == "ladder":
                     lo = lv.low if lv.low > 0 else floor_y
