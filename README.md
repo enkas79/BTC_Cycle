@@ -17,9 +17,10 @@ Applicazione desktop (Python + PyQt6) che analizza documenti sul ciclo di Bitcoi
   incoerenti, campioni ridotti, stress test sul prezzo medio.
 - **Grafico live** (scheda Grafico): prezzo BTC (aggiornato ogni 60 s) con fasce della ladder, floor/fair
   value della power law, livelli di invalidazione, MA200 e finestra di minimo. Documenti e parametri
-  sono in *Strumenti*. Scala lineare/logaritmica selezionabile.
-- **Lingua** italiano/inglese (Strumenti → Lingua, applicata al riavvio). Il testo del piano generato
-  e le etichette dei parametri estratti restano in italiano.
+  sono in *Strumenti*. Scala lineare/logaritmica selezionabile; il click sul grafico traccia le linee di prezzo e data
+  del punto (click destro per rimuoverle).
+- **Lingua** italiano/inglese (Strumenti → Lingua, applicata al riavvio). Anche piano ed export sono
+  tradotti (date in formato aaaa-mm-gg in inglese).
 - Esporta il piano in HTML o Markdown. Autoupdate da GitHub Releases.
 
 ## Sviluppo

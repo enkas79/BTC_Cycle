@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QPushButton, QVBoxLa
 from ..core.chart import FAILED_RALLY_MEDIAN_PCT, build_overlays, nearest_zone, rally_from_low
 from ..core.market import fetch_history, fetch_spot
 from ..core.planner import Plan, usd
-from ..i18n import tr
+from ..i18n import fmt_date, tr
 from .style import ACCENT_DARK, INK
 
 POLL_MS = 60_000  # CoinGecko gratuito: ~30 chiamate/min, 1/min è ampiamente nei limiti
@@ -43,6 +43,7 @@ class ChartTab(QWidget):
         self.plan: Optional[Plan] = None
         self.history: List[Tuple[float, float]] = []
         self.spot: Optional[float] = None
+        self._click: Optional[Tuple[float, float]] = None  # (timestamp, prezzo) del punto cliccato
         self._busy = False
         self._status = ""
 
@@ -51,6 +52,7 @@ class ChartTab(QWidget):
         self.plot.showGrid(x=True, y=True, alpha=0.15)
         self.plot.setMenuEnabled(False)
         self.plot.getAxis("left").setLabel("USD")
+        self.plot.scene().sigMouseClicked.connect(self._on_click)
 
         self.info = QLabel(tr("Genera un piano per vedere livelli e finestre della strategia."))
         self.info.setObjectName("hint")
@@ -142,6 +144,32 @@ class ChartTab(QWidget):
         parts.append(self._status)
         self.info.setText(" · ".join(p for p in parts if p))
 
+    def _on_click(self, ev) -> None:
+        """Click sinistro: linee di prezzo e data nel punto; click destro: le rimuove."""
+        vb = self.plot.getPlotItem().vb
+        if not self.history or not vb.sceneBoundingRect().contains(ev.scenePos()):
+            return
+        if ev.button() == pg.QtCore.Qt.MouseButton.RightButton:
+            self._click = None
+        elif ev.button() == pg.QtCore.Qt.MouseButton.LeftButton:
+            pt = vb.mapSceneToView(ev.scenePos())
+            price = 10 ** pt.y() if self.log_box.isChecked() else pt.y()
+            self._click = (pt.x(), price) if price > 0 else None
+        else:
+            return
+        self._redraw(reset_view=False)
+
+    def _draw_click(self) -> None:
+        x, price = self._click
+        pen = _pen("#6a1b9a", 1, dash=True)
+        self.plot.addItem(pg.InfiniteLine(self._y(price), angle=0, pen=pen), ignoreBounds=True)
+        self.plot.addItem(pg.InfiniteLine(x, angle=90, pen=pen), ignoreBounds=True)
+        text = f"{fmt_date(datetime.fromtimestamp(x).date())} · {usd(price)}"
+        if self.spot:
+            text += " " + tr("({d:+.1f}% dal prezzo attuale)").format(d=(price / self.spot - 1) * 100)
+        x_min, x_max = self.plot.getPlotItem().vb.viewRange()[0]
+        self._label(text, x, price, "#6a1b9a", right=x > (x_min + x_max) / 2)
+
     def _y(self, v: float) -> float:
         """Le posizioni degli oggetti del grafico sono in log10 quando la scala è logaritmica."""
         return math.log10(v) if self.log_box.isChecked() else v
@@ -150,8 +178,8 @@ class ChartTab(QWidget):
         QSettings("enkas79", "BTC_Cycle").setValue("chart_log", checked)
         self._redraw(reset_view=True)
 
-    def _label(self, text: str, x: float, y: float, color: str) -> None:
-        item = pg.TextItem(text, color=color, anchor=(0, 1))
+    def _label(self, text: str, x: float, y: float, color: str, right: bool = False) -> None:
+        item = pg.TextItem(text, color=color, anchor=(1 if right else 0, 1))
         item.setPos(x, self._y(y))
         self.plot.addItem(item, ignoreBounds=True)
 
@@ -217,6 +245,9 @@ class ChartTab(QWidget):
             plot.addItem(pg.InfiniteLine(self._y(self.spot), angle=0, pen=_pen("#f7931a", 2)),
                          ignoreBounds=True)
             self._label(tr("Prezzo {p}").format(p=usd(self.spot)), xs[-1], self.spot, ACCENT_DARK)
+
+        if self._click:
+            self._draw_click()
 
         if reset_view:
             ymin, ymax = min(lows) * 0.85, max(highs) * 1.1

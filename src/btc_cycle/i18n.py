@@ -88,6 +88,10 @@ EN = {
     "Ladder {n} · {rng} · {pct}%": "Ladder {n} · {rng} · {pct}%",
 }
 
+from .i18n_plan import EN_PLAN  # noqa: E402
+
+EN.update(EN_PLAN)
+
 GUIDE_EN = """
 <h2>{app} — Guide</h2>
 <p>The program reads documents (PDF, TXT, MD) on the Bitcoin cycle, the power law and accumulation
@@ -121,7 +125,8 @@ as stated in the source document.</li>
 <h3>4. Chart</h3>
 <p>The <b>Chart</b> tab shows the BTC price (refreshed every 60 s) with the ladder bands, the power-law
 fair value and floor, invalidation levels, MA200 and the bottom window. Use the checkbox to switch
-between linear and logarithmic scale.</p>
+between linear and logarithmic scale. Left-click a point to draw its price and date lines (the label
+shows the difference from the current price); right-click removes them.</p>
 
 <h3>5. Read the warnings</h3>
 <p>The <b>Warnings</b> section flags single sources, promotional content, diverging estimates, small
@@ -142,3 +147,20 @@ def get_lang() -> str:
 
 def tr(text: str) -> str:
     return EN.get(text, text) if _lang == "en" else text
+
+
+def fmt_date(d) -> str:
+    """Data per i report: gg/mm/aaaa in italiano, aaaa-mm-gg in inglese (nessuna ambiguità)."""
+    if not d:
+        return tr("n/d")
+    return d.strftime("%Y-%m-%d" if _lang == "en" else "%d/%m/%Y")
+
+
+def tr_label(label: str) -> str:
+    """Traduce le etichette salvate nella knowledge base, comprese quelle con un suffisso variabile."""
+    if _lang != "en" or label in EN:
+        return tr(label)
+    for it, en in (("Livello citato (", "Cited level ("), ("Rendimento mediano di ", "Median return of ")):
+        if label.startswith(it):
+            return en + label[len(it):]
+    return label

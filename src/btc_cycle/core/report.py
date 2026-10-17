@@ -5,80 +5,84 @@ from __future__ import annotations
 import html
 from typing import Any, List, Tuple
 
+from ..i18n import fmt_date, tr, tr_label
 from .planner import Plan, pct, usd
 
 Block = Tuple[Any, ...]  # ("p", testo) | ("ul", [voci]) | ("table", intestazioni, righe) | ("warn", [voci])
 
 
-def _d(d) -> str:
-    return d.strftime("%d/%m/%Y") if d else "n/d"
+_d = fmt_date
 
 
 def build_sections(plan: Plan) -> List[Tuple[str, List[Block]]]:
     s, cur = plan.situation, plan.inputs.currency
     sections: List[Tuple[str, List[Block]]] = []
 
-    sections.append(("Cosa fare adesso", [("ul", plan.actions_now or ["Nessuna azione."])]))
+    sections.append((tr("Cosa fare adesso"), [("ul", plan.actions_now or [tr("Nessuna azione.")])]))
 
     rows = [
-        ["Data analisi", _d(s["today"])],
-        ["Prezzo BTC", usd(s["price"])],
-        ["Ultimo halving", f"{_d(s['last_halving'])} ({s['days_since']} giorni, "
-                           f"{s['months_since']:.1f} mesi)"],
-        ["Fase del ciclo", f"{s['phase'].name} — {s['phase'].description}"],
-        ["Minimo stimato (H+offset)", _d(s["est_bottom"])],
-        ["Finestra di minimo", f"{_d(s['window_start'])} – {_d(s['window_end'])}"],
+        [tr("Data analisi"), _d(s["today"])],
+        [tr("Prezzo BTC"), usd(s["price"])],
+        [tr("Ultimo halving"), tr("{d} ({days} giorni, {m:.1f} mesi)").format(
+            d=_d(s["last_halving"]), days=s["days_since"], m=s["months_since"])],
+        [tr("Fase del ciclo"), f"{s['phase'].name} — {s['phase'].description}"],
+        [tr("Minimo stimato (H+offset)"), _d(s["est_bottom"])],
+        [tr("Finestra di minimo"), f"{_d(s['window_start'])} – {_d(s['window_end'])}"],
     ]
     if s.get("ttl_window"):
-        rows.append(["Minimo da massimo+12/13 mesi",
+        rows.append([tr("Minimo da massimo+12/13 mesi"),
                      f"{_d(s['ttl_window'][0])} – {_d(s['ttl_window'][1])}"])
     if s.get("ath"):
-        rows.append(["Massimo di ciclo", f"{usd(s['ath'])} ({_d(s.get('ath_date'))}) — "
-                                         f"drawdown {pct(s['drawdown'])}"])
+        rows.append([tr("Massimo di ciclo"), tr("{p} ({d}) — drawdown {dd}").format(
+            p=usd(s["ath"]), d=_d(s.get("ath_date")), dd=pct(s["drawdown"]))])
     rows += [
-        ["Fair value power law", f"{usd(s['fair'])} (prezzo {pct(s['vs_fair'])})"],
-        ["Floor power law", f"{usd(s['floor'])} (prezzo {pct(s['vs_floor'])})"],
-        ["Prossimo halving", _d(s["next_halving"])],
+        [tr("Fair value power law"), tr("{v} (prezzo {p})").format(v=usd(s["fair"]), p=pct(s["vs_fair"]))],
+        [tr("Floor power law"), tr("{v} (prezzo {p})").format(v=usd(s["floor"]), p=pct(s["vs_floor"]))],
+        [tr("Prossimo halving"), _d(s["next_halving"])],
     ]
-    sections.append(("Situazione di mercato e ciclo", [("table", ["Voce", "Valore"], rows)]))
+    sections.append((tr("Situazione di mercato e ciclo"),
+                     [("table", [tr("Voce"), tr("Valore")], rows)]))
 
     p = plan.pots
-    blocks: List[Block] = [("table", ["Quota", "Importo"], [
-        ["Capitale totale", f"{p['capital']:,.0f} {cur}"],
-        [f"Capitale 'finestra di minimo' ({p['bottom_pct']:.0f}%)", f"{p['bottom']:,.0f} {cur}"],
-        ["Capitale DCA esteso", f"{p['dca']:,.0f} {cur}"],
-        ["Non allocato", f"{p['idle']:,.0f} {cur}"],
+    blocks: List[Block] = [("table", [tr("Quota"), tr("Importo")], [
+        [tr("Capitale totale"), f"{p['capital']:,.0f} {cur}"],
+        [tr("Capitale 'finestra di minimo' ({p:.0f}%)").format(p=p["bottom_pct"]),
+         f"{p['bottom']:,.0f} {cur}"],
+        [tr("Capitale DCA esteso"), f"{p['dca']:,.0f} {cur}"],
+        [tr("Non allocato"), f"{p['idle']:,.0f} {cur}"],
     ])]
-    sections.append(("Ripartizione del capitale", blocks))
+    sections.append((tr("Ripartizione del capitale"), blocks))
 
     if p["bottom"]:
         factor = s.get("ladder_factor", 1.0)
-        note = (f"Zone riancorate al floor attuale (fattore {factor:.3f})." if factor != 1.0
-                else "Zone come da documento.")
+        note = (tr("Zone riancorate al floor attuale (fattore {f:.3f}).").format(f=factor)
+                if factor != 1.0 else tr("Zone come da documento."))
         ladder_rows = [
             [str(r["rung"]),
              (f"{usd(r['low'])} – {usd(r['high'])}" if r["low"] else f"< {usd(r['high'])}"),
-             f"{r['pct']}%" + (" + riserva flush" if r["plus_reserve"] else ""),
+             f"{r['pct']}%" + (tr(" + riserva flush") if r["plus_reserve"] else ""),
              f"{r['amount']:,.0f} {cur}", f"{r['btc']:.5f}", usd(r["trigger"]), r["status"]]
             for r in plan.ladder
         ]
         d, r = plan.drip, plan.reserve
-        sections.append(("Finestra di minimo: ladder, drip e riserva", [
-            ("p", "Regola: un gradino scatta solo con una chiusura giornaliera sotto il minimo "
-                  "di chiusura del ciclo (non con uno spike intraday). " + note),
-            ("table", ["#", "Zona", "% capitale", "Importo", "BTC stimati", "Scatta a ≤",
-                       "Stato"], ladder_rows),
+        sections.append((tr("Finestra di minimo: ladder, drip e riserva"), [
+            ("p", tr("Regola: un gradino scatta solo con una chiusura giornaliera sotto il minimo "
+                     "di chiusura del ciclo (non con uno spike intraday). ") + note),
+            ("table", ["#", tr("Zona"), tr("% capitale"), tr("Importo"), tr("BTC stimati"),
+                       tr("Scatta a ≤"), tr("Stato")], ladder_rows),
             ("ul", [
-                f"Drip: {d['pct']}% al giorno = {d['daily']:,.0f} {cur} finché il prezzo è sotto "
-                f"il floor ({usd(d['floor'])}); budget {d['total']:,.0f} {cur} ≈ {d['days']} "
-                f"giorni. Stato: {'ATTIVO' if d['active'] else 'in pausa'}.",
-                f"Riserva: {r['total']:,.0f} {cur}, di cui {r['flush']:,.0f} per un flush "
-                f"violento (ultimo gradino) e {r['backstop']:,.0f} di backstop.",
-                f"Anti-miss: dal {_d(r['anti_miss_date'])}, se sei sotto-investito, distribuisci il "
-                f"residuo in rate settimanali (≥ {r['weekly_min']:,.0f} {cur}/sett.) entro "
-                f"{_d(r['window_end'])}.",
-                "Mai comprare su candele verdi/rally; se il prezzo rompe al rialzo prima delle "
-                "zone profonde, passa a DCA semplice.",
+                tr("Drip: {pct}% al giorno = {daily:,.0f} {cur} finché il prezzo è sotto il floor "
+                   "({fl}); budget {tot:,.0f} {cur} ≈ {days} giorni. Stato: {st}.").format(
+                    pct=d["pct"], daily=d["daily"], cur=cur, fl=usd(d["floor"]), tot=d["total"],
+                    days=d["days"], st=tr("ATTIVO") if d["active"] else tr("in pausa")),
+                tr("Riserva: {tot:,.0f} {cur}, di cui {fl:,.0f} per un flush violento (ultimo "
+                   "gradino) e {bk:,.0f} di backstop.").format(
+                    tot=r["total"], cur=cur, fl=r["flush"], bk=r["backstop"]),
+                tr("Anti-miss: dal {d}, se sei sotto-investito, distribuisci il residuo in rate "
+                   "settimanali (≥ {w:,.0f} {cur}/sett.) entro {e}.").format(
+                    d=_d(r["anti_miss_date"]), w=r["weekly_min"], cur=cur, e=_d(r["window_end"])),
+                tr("Mai comprare su candele verdi/rally; se il prezzo rompe al rialzo prima delle "
+                   "zone profonde, passa a DCA semplice."),
             ]),
         ]))
 
@@ -87,62 +91,63 @@ def build_sections(plan: Plan) -> List[Tuple[str, List[Block]]]:
                      f"{x['max_amount']:,.0f} {cur}"] for x in plan.dca]
         b = plan.boost_now
         boost_rows = [[x["condition"], f"+{x['boost']}%",
-                       "n/d" if x["active"] is None else ("SÌ" if x["active"] else "no")]
+                       tr("n/d") if x["active"] is None else (tr("SÌ") if x["active"] else tr("no"))]
                       for x in plan.boosters]
-        kill = ("n/d (serve MA200)" if b["kill_switch"] is None
-                else ("ATTIVO: boost sospesi" if b["kill_switch"] else "non attivo"))
-        sections.append(("DCA esteso front-loaded", [
-            ("p", f"Inizio: {_d(s['dca_start'])}. Rate mensili decrescenti (front-load)."),
-            ("table", ["Mese", "Data", "% capitale DCA", "Rata base", "Rata max con boost"],
-             dca_rows),
-            ("table", ["Boost", "Incremento", "Attivo ora"], boost_rows),
-            ("ul", [f"Boost totale attuale: +{b['total']:.0f}% (tetto +{b['cap']:.0f}%).",
-                    f"Kill-switch (prezzo > MA200 +{b['kill_pct']:.0f}%): {kill}."]
+        kill = (tr("n/d (serve MA200)") if b["kill_switch"] is None
+                else (tr("ATTIVO: boost sospesi") if b["kill_switch"] else tr("non attivo")))
+        sections.append((tr("DCA esteso front-loaded"), [
+            ("p", tr("Inizio: {d}. Rate mensili decrescenti (front-load).").format(d=_d(s["dca_start"]))),
+            ("table", [tr("Mese"), tr("Data"), tr("% capitale DCA"), tr("Rata base"),
+                       tr("Rata max con boost")], dca_rows),
+            ("table", [tr("Boost"), tr("Incremento"), tr("Attivo ora")], boost_rows),
+            ("ul", [tr("Boost totale attuale: +{t:.0f}% (tetto +{c:.0f}%).").format(t=b["total"], c=b["cap"]),
+                    tr("Kill-switch (prezzo > MA200 +{p:.0f}%): {k}.").format(p=b["kill_pct"], k=kill)]
              + plan.dca_notes),
         ]))
     elif plan.dca_notes:
-        sections.append(("DCA esteso", [("ul", plan.dca_notes)]))
+        sections.append((tr("DCA esteso"), [("ul", plan.dca_notes)]))
 
-    sections.append(("Cosa comprare", [("ul", plan.allocation)]))
+    sections.append((tr("Cosa comprare"), [("ul", plan.allocation)]))
 
-    exit_rows = [[_d(x["date"]), f"H+{x['offset']} mesi", f"{x['sell_pct']}%",
+    exit_rows = [[_d(x["date"]), f"H+{x['offset']} " + tr("mesi"), f"{x['sell_pct']}%",
                   f"{x['remaining']:.0f}%"] for x in plan.exit_steps]
-    sections.append(("Piano di uscita (prossimo ciclo)", [
-        ("table", ["Data", "Offset", "Vendi (% posizione)", "Residuo"], exit_rows),
+    sections.append((tr("Piano di uscita (prossimo ciclo)"), [
+        ("table", [tr("Data"), tr("Offset"), tr("Vendi (% posizione)"), tr("Residuo")], exit_rows),
         ("ul", plan.exit_notes),
     ]))
 
     if plan.levels:
-        sections.append(("Livelli che decidono lo scenario", [
-            ("table", ["Livello", "Prezzo", "Tipo", "Stato"],
-             [[lv["name"], usd(lv["price"]), lv["kind"], lv["status"]] for lv in plan.levels]),
+        sections.append((tr("Livelli che decidono lo scenario"), [
+            ("table", [tr("Livello"), tr("Prezzo"), tr("Tipo"), tr("Stato")],
+             [[lv["name"], usd(lv["price"]), tr(lv["kind"]), lv["status"]] for lv in plan.levels]),
         ]))
 
     sc = plan.scenarios
     blocks = []
     if sc.get("bottom"):
-        blocks.append(("table", ["Scenario minimo", "Drawdown", "Prezzo"],
+        blocks.append(("table", [tr("Scenario minimo"), tr("Drawdown"), tr("Prezzo")],
                        [[b["name"], f"-{b['drawdown']}%", usd(b["price"])] for b in sc["bottom"]]))
     if sc.get("peak"):
-        blocks.append(("table", ["Da minimo", "Guadagno", "Picco implicito"],
+        blocks.append(("table", [tr("Da minimo"), tr("Guadagno"), tr("Picco implicito")],
                        [[f"{x['bottom_name']} ({usd(x['bottom'])})", f"+{x['gain']}%",
                          usd(x["peak"])] for x in sc["peak"]]))
     if sc.get("target"):
-        blocks.append(("p", f"Obiettivo di picco dichiarato: {usd(sc['target'][0]['price'])}."))
+        blocks.append(("p", tr("Obiettivo di picco dichiarato: {p}.")
+                       .format(p=usd(sc["target"][0]["price"]))))
     if plan.bottom_estimates:
-        blocks.append(("table", ["Fonte", "Stima", "Minimo", "Massimo"],
-                       [[e["doc_title"], e["label"], usd(e["low"]), usd(e["high"])]
+        blocks.append(("table", [tr("Fonte"), tr("Stima"), tr("Minimo"), tr("Massimo")],
+                       [[e["doc_title"], tr_label(e["label"]), usd(e["low"]), usd(e["high"])]
                         for e in plan.bottom_estimates]))
     if blocks:
-        sections.append(("Scenari e stime del minimo per fonte", blocks))
+        sections.append((tr("Scenari e stime del minimo per fonte"), blocks))
 
-    sections.append(("Avvertenze (partner critico)", [("warn", plan.warnings)]))
+    sections.append((tr("Avvertenze (partner critico)"), [("warn", plan.warnings)]))
 
-    blocks = [("ul", plan.documents or ["Nessun documento: uso solo parametri predefiniti."])]
+    blocks = [("ul", plan.documents or [tr("Nessun documento: uso solo parametri predefiniti.")])]
     if plan.params_used:
-        blocks.append(("table", ["Parametro", "Valore", "Fonte"],
+        blocks.append(("table", [tr("Parametro"), tr("Valore"), tr("Fonte")],
                        [list(x) for x in plan.params_used]))
-    sections.append(("Fonti e parametri usati", blocks))
+    sections.append((tr("Fonti e parametri usati"), blocks))
     return sections
 
 
@@ -158,13 +163,14 @@ td { padding: 3px 8px; border-bottom: 1px solid #e3e6ec; }
 """
 
 
-def render_html(plan: Plan, title: str = "Piano di investimento Bitcoin") -> str:
+def render_html(plan: Plan, title: str = "") -> str:
+    title = title or tr("Piano di investimento Bitcoin")
     e = html.escape
     out = [f"<html><head><meta charset='utf-8'><title>{e(title)}</title>",
            f"<style>{CSS}</style></head><body>",
            f"<h1>{e(title)}</h1>",
-           f"<p class='muted'>Generato il {_d(plan.situation['today'])} · profilo "
-           f"{e(plan.inputs.profile)} · non è consulenza finanziaria</p>"]
+           "<p class='muted'>" + e(tr("Generato il {d} · profilo {p} · non è consulenza finanziaria").format(
+               d=_d(plan.situation["today"]), p=tr(plan.inputs.profile))) + "</p>"]
     for heading, blocks in build_sections(plan):
         out.append(f"<h2>{e(heading)}</h2>")
         for block in blocks:
@@ -183,10 +189,11 @@ def render_html(plan: Plan, title: str = "Piano di investimento Bitcoin") -> str
     return "\n".join(out)
 
 
-def render_markdown(plan: Plan, title: str = "Piano di investimento Bitcoin") -> str:
+def render_markdown(plan: Plan, title: str = "") -> str:
+    title = title or tr("Piano di investimento Bitcoin")
     out = [f"# {title}", "",
-           f"_Generato il {_d(plan.situation['today'])} · profilo {plan.inputs.profile} · "
-           "non è consulenza finanziaria_", ""]
+           "_" + tr("Generato il {d} · profilo {p} · non è consulenza finanziaria").format(
+               d=_d(plan.situation["today"]), p=tr(plan.inputs.profile)) + "_", ""]
     for heading, blocks in build_sections(plan):
         out += [f"## {heading}", ""]
         for block in blocks:

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import List, Optional
 
+from ..i18n import tr
+
 GENESIS = date(2009, 1, 3)
 HALVINGS = [date(2012, 11, 28), date(2016, 7, 9), date(2020, 5, 11), date(2024, 4, 20)]
 NEXT_HALVING_ESTIMATE = date(2028, 4, 17)  # stima per altezza di blocco 1.050.000
@@ -57,22 +59,22 @@ def cycle_phase(months_since_halving: float, peak_offset: int, bottom_offset: in
     """Classifica la fase del ciclo in base ai mesi trascorsi dall'ultimo halving."""
     m = months_since_halving
     if m < peak_offset - 2:
-        return Phase("bull", "Rialzo post-halving",
-                     "Fase storicamente rialzista: mantenere, niente nuovi acquisti aggressivi.")
+        return Phase("bull", tr("Rialzo post-halving"),
+                     tr("Fase storicamente rialzista: mantenere, niente nuovi acquisti aggressivi."))
     if m < peak_offset + 3:
-        return Phase("peak", "Finestra di picco",
-                     "Zona temporale dei massimi storici di ciclo: applicare il piano di uscita.")
+        return Phase("peak", tr("Finestra di picco"),
+                     tr("Zona temporale dei massimi storici di ciclo: applicare il piano di uscita."))
     if m < bottom_offset - 3:
-        return Phase("bear", "Mercato ribassista",
-                     "Distribuzione e calo: preservare il capitale, preparare i livelli di acquisto.")
+        return Phase("bear", tr("Mercato ribassista"),
+                     tr("Distribuzione e calo: preservare il capitale, preparare i livelli di acquisto."))
     if m < bottom_offset + 4:
-        return Phase("bottom", "Finestra di minimo",
-                     "Zona temporale dei minimi di ciclo: ladder + drip + riserva.")
+        return Phase("bottom", tr("Finestra di minimo"),
+                     tr("Zona temporale dei minimi di ciclo: ladder + drip + riserva."))
     if m < accumulation_end:
-        return Phase("accumulation", "Accumulo",
-                     "Dopo il minimo, prima dell'halving: DCA front-loaded con boost.")
-    return Phase("pre_halving", "Pre-halving",
-                 "Ciclo maturo: mantenere, prepararsi al rialzo post-halving.")
+        return Phase("accumulation", tr("Accumulo"),
+                     tr("Dopo il minimo, prima dell'halving: DCA front-loaded con boost."))
+    return Phase("pre_halving", tr("Pre-halving"),
+                 tr("Ciclo maturo: mantenere, prepararsi al rialzo post-halving."))
 
 
 @dataclass

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..i18n import fmt_date, tr
 from . import cycle as cy
 from .knowledge import KnowledgeBase
 
@@ -117,7 +118,7 @@ class Planner:
     def _track(self, plan: Plan, label: str, key: str) -> None:
         value, source = self.get(key)
         if value is not None:
-            plan.params_used.append((label, _short(value), source))
+            plan.params_used.append((tr(label), _short(value), tr(source)))
 
     # --- costruzione del piano ---
     def build(self, inp: PlanInputs) -> Plan:
@@ -219,10 +220,10 @@ class Planner:
         phase = s["phase"].key
         deploy = phase in ("bear", "bottom", "accumulation")
         if phase in ("bull", "peak"):
-            plan.dca_notes.append(
+            plan.dca_notes.append(tr(
                 "Fase di rialzo/picco: i documenti non prevedono nuovi acquisti ora. Il capitale "
                 "resta non allocato fino alla prossima finestra di minimo."
-            )
+            ))
         window_open = inp.today <= s["window_end"]
         if not window_open or phase == "accumulation":
             bottom_pct = 0.0
@@ -274,16 +275,19 @@ class Planner:
             amount = pot * z["pct"] / 100 + (flush_amount if z.get("plus_reserve") else 0.0)
             ref_price = (lo + hi) / 2 if lo > 0 else hi * 0.95
             trigger = min(hi, low_close) if low_close else hi
+            waiting = False
             if lo > 0 and lo <= price <= hi:
-                status = "IN ZONA ora"
+                status = tr("IN ZONA ora")
             elif price < (lo if lo > 0 else hi):
-                status = "sotto la zona (acquistabile)"
+                status = tr("sotto la zona (acquistabile)")
             else:
-                status = f"in attesa ({(trigger / price - 1) * 100:+.1f}% dal prezzo)"
+                waiting = True
+                status = tr("in attesa ({d:+.1f}% dal prezzo)").format(d=(trigger / price - 1) * 100)
             plan.ladder.append({
                 "rung": i, "low": lo, "high": hi, "pct": z["pct"],
                 "plus_reserve": z.get("plus_reserve", False), "amount": amount,
                 "btc": self._btc(plan, amount, ref_price), "trigger": trigger, "status": status,
+                "waiting": waiting,
             })
 
         drip_pct = float(self.val("accum.drip_daily_pct_slow" if inp.slow_drip
@@ -325,19 +329,19 @@ class Planner:
             plan.dca.append({"n": month, "date": cy.add_months(start, month - 1), "pct": share,
                              "amount": amount, "max_amount": amount * (1 + cap / 100)})
         if pot and inp.today > s["accumulation_end"]:
-            plan.dca_notes.append("La finestra di accumulo primaria (H+48) è già chiusa.")
-        plan.dca_notes.append(
+            plan.dca_notes.append(tr("La finestra di accumulo primaria (H+48) è già chiusa."))
+        plan.dca_notes.append(tr(
             "I boost si finanziano anticipando le rate finali (il piano si accorcia), "
             "non aggiungendo capitale nuovo."
-        )
+        ))
 
         price = inp.btc_price_usd
         defs = [
-            ("dca.booster_drawdown", "BTC ≥{t}% sotto il massimo a 200 giorni",
+            ("dca.booster_drawdown", tr("BTC ≥{t}% sotto il massimo a 200 giorni"),
              None if not inp.high200 else (lambda t: price <= inp.high200 * (1 - t / 100))),
-            ("dca.booster_fear", "Fear & Greed sotto {t}",
+            ("dca.booster_fear", tr("Fear & Greed sotto {t}"),
              None if inp.fear_greed is None else (lambda t: inp.fear_greed < t)),
-            ("dca.booster_vix", "VIX sopra {t} (o picco di volatilità crypto)",
+            ("dca.booster_vix", tr("VIX sopra {t} (o picco di volatilità crypto)"),
              None if inp.vix is None else (lambda t: inp.vix > t)),
         ]
         total = 0.0
@@ -366,19 +370,20 @@ class Planner:
         eth = min(profile["eth_max"], init["eth_max_pct"])
         alt_max = min(profile["alts_max"], alts["max_pct"])
         plan.allocation.append(
-            f"Primi {init['months']} mesi: {100 - eth:.0f}% BTC"
-            + (f", fino a {eth:.0f}% ETH." if eth else " (profilo: niente ETH).")
+            tr("Primi {m} mesi: {btc:.0f}% BTC").format(m=init["months"], btc=100 - eth)
+            + (tr(", fino a {eth:.0f}% ETH.").format(eth=eth) if eth else tr(" (profilo: niente ETH)."))
         )
         if alt_max:
             plan.allocation.append(
-                f"Mesi {alts['from_month']}–{alts['to_month']}: fino a {alt_max:.0f}% in altcoin "
-                f"top-{alts['top']}, solo con trend settimanale di BTC al rialzo. "
-                "Evitare ranking 51–100 (nei dati dei documenti: rendimenti negativi e molti fallimenti)."
+                tr("Mesi {a}–{b}: fino a {mx:.0f}% in altcoin top-{top}, solo con trend settimanale di "
+                   "BTC al rialzo. Evitare ranking 51–100 (nei dati dei documenti: rendimenti negativi "
+                   "e molti fallimenti).").format(a=alts["from_month"], b=alts["to_month"], mx=alt_max,
+                                                  top=alts["top"])
             )
         else:
-            plan.allocation.append("Profilo prudente: 100% BTC, nessuna altcoin.")
+            plan.allocation.append(tr("Profilo prudente: 100% BTC, nessuna altcoin."))
         if self.val("rule.no_leverage", True):
-            plan.allocation.append("Nessuna leva finanziaria.")
+            plan.allocation.append(tr("Nessuna leva finanziaria."))
 
     def _exit(self, plan: Plan) -> None:
         s = plan.situation
@@ -395,19 +400,20 @@ class Planner:
         days = self.val("cycle.days_to_peak_range")
         s["peak_window"] = (nh + timedelta(days=days[0]), nh + timedelta(days=days[1]))
         plan.exit_notes.append(
-            f"Finestra di picco attesa: {s['peak_window'][0]:%b %Y} – {s['peak_window'][1]:%b %Y} "
-            f"(halving {nh:%b %Y} + {days[0]}–{days[1]} giorni)."
+            tr("Finestra di picco attesa: {a:%b %Y} – {b:%b %Y} (halving {h:%b %Y} + {d0}–{d1} giorni).")
+            .format(a=s["peak_window"][0], b=s["peak_window"][1], h=nh, d0=days[0], d1=days[1])
         )
-        plan.exit_notes.append(f"Quota da non vendere mai (moon bag): {moon}%.")
+        plan.exit_notes.append(tr("Quota da non vendere mai (moon bag): {moon}%.").format(moon=moon))
         rsi = self.val("exit.weekly_rsi_above")
         euph = self.val("exit.euphoria_min")
         if rsi:
-            plan.exit_notes.append(f"Conferma secondaria: RSI settimanale sopra {rsi}.")
+            plan.exit_notes.append(tr("Conferma secondaria: RSI settimanale sopra {rsi}.").format(rsi=rsi))
         if euph:
             plan.exit_notes.append(
-                f"Vendi senza esitare se compaiono {euph}+ segnali di euforia nella finestra temporale."
+                tr("Vendi senza esitare se compaiono {n}+ segnali di euforia nella finestra temporale.")
+                .format(n=euph)
             )
-        plan.exit_notes.append("Nuovo massimo storico → inizia subito le prese di profitto parziali.")
+        plan.exit_notes.append(tr("Nuovo massimo storico → inizia subito le prese di profitto parziali."))
 
     def _levels(self, plan: Plan) -> None:
         price = plan.inputs.btc_price_usd
@@ -417,15 +423,15 @@ class Planner:
             self._track(plan, "Livello rialzista", "levels.invalidation_up")
             plan.levels.append({
                 "name": up["name"], "price": up["price"], "kind": "rialzo",
-                "status": "ROTTO: trend ribassista finito → DCA semplice" if price > up["price"]
-                else f"{(up['price'] / price - 1) * 100:+.1f}% dal prezzo",
+                "status": tr("ROTTO: trend ribassista finito → DCA semplice") if price > up["price"]
+                else tr("{d:+.1f}% dal prezzo").format(d=(up["price"] / price - 1) * 100),
             })
         if down:
             self._track(plan, "Livello ribassista", "levels.invalidation_down")
             plan.levels.append({
                 "name": down["name"], "price": down["price"], "kind": "ribasso",
-                "status": "ROTTO: gamba finale ribassista → ladder" if price < down["price"]
-                else f"{(down['price'] / price - 1) * 100:+.1f}% dal prezzo",
+                "status": tr("ROTTO: gamba finale ribassista → ladder") if price < down["price"]
+                else tr("{d:+.1f}% dal prezzo").format(d=(down["price"] / price - 1) * 100),
             })
 
     def _scenarios(self, plan: Plan) -> None:
@@ -433,8 +439,8 @@ class Planner:
         bottoms = self.val("cycle.bottom_scenarios") or []
         if not bottoms and s.get("ath"):
             hist = self.val("cycle.drawdown_history") or [93, 86, 84, 77]
-            for name, dd in (("Conservativo", hist[-1] - 17), ("Base", hist[-1] - 10),
-                             ("Aggressivo", hist[-1] - 5)):
+            for name, dd in ((tr("Conservativo"), hist[-1] - 17), (tr("Base"), hist[-1] - 10),
+                             (tr("Aggressivo"), hist[-1] - 5)):
                 bottoms.append({"name": name, "drawdown": dd, "price": s["ath"] * (1 - dd / 100)})
         plan.scenarios["bottom"] = bottoms
         gains = self.val("cycle.next_gain_range")
@@ -453,43 +459,46 @@ class Planner:
         cur = inp.currency
         phase = s["phase"].key
         if plan.pots["idle"]:
-            a.append("Nessun acquisto: fase di rialzo/picco. Segui il piano di uscita.")
+            a.append(tr("Nessun acquisto: fase di rialzo/picco. Segui il piano di uscita."))
             return
         up = next((lv for lv in plan.levels if lv["kind"] == "rialzo"), None)
         if up and inp.btc_price_usd > up["price"]:
-            a.append("Livello rialzista rotto: sospendi la ladder e passa a DCA semplice "
-                     "(regola 'shift to plain DCA').")
+            a.append(tr("Livello rialzista rotto: sospendi la ladder e passa a DCA semplice "
+                        "(regola 'shift to plain DCA')."))
         if plan.pots["bottom"]:
-            active = [r for r in plan.ladder if not r["status"].startswith("in attesa")]
+            active = [r for r in plan.ladder if not r["waiting"]]
             for r in active:
-                a.append(f"Ladder gradino {r['rung']}: acquista {r['amount']:,.0f} {cur} alla "
-                         f"prossima chiusura giornaliera ≤ {usd(r['trigger'])} (nuovo minimo).")
+                a.append(tr("Ladder gradino {n}: acquista {amt:,.0f} {cur} alla prossima chiusura "
+                            "giornaliera ≤ {trg} (nuovo minimo).")
+                         .format(n=r["rung"], amt=r["amount"], cur=cur, trg=usd(r["trigger"])))
             if plan.drip["active"]:
-                a.append(f"Drip ATTIVO (prezzo sotto il floor {usd(plan.drip['floor'])}): "
-                         f"{plan.drip['daily']:,.0f} {cur} al giorno.")
+                a.append(tr("Drip ATTIVO (prezzo sotto il floor {fl}): {amt:,.0f} {cur} al giorno.")
+                         .format(fl=usd(plan.drip["floor"]), amt=plan.drip["daily"], cur=cur))
             else:
-                a.append(f"Drip in pausa: il prezzo è sopra il floor {usd(plan.drip['floor'])}.")
+                a.append(tr("Drip in pausa: il prezzo è sopra il floor {fl}.")
+                         .format(fl=usd(plan.drip["floor"])))
             if not active:
                 nxt = plan.ladder[0] if plan.ladder else None
                 if nxt:
-                    a.append(f"Nessun gradino attivo: il primo scatta a chiusura ≤ "
-                             f"{usd(nxt['trigger'])}. Non inseguire i rally.")
+                    a.append(tr("Nessun gradino attivo: il primo scatta a chiusura ≤ {trg}. "
+                                "Non inseguire i rally.").format(trg=usd(nxt["trigger"])))
             r = plan.reserve
             if r["anti_miss_active"]:
-                a.append(f"Anti-miss ATTIVO: se sei investito meno del previsto, distribuisci il "
-                         f"residuo del capitale 'minimo' in ~{r['weeks_left']} rate settimanali "
-                         f"entro {r['window_end']:%d/%m/%Y}.")
+                a.append(tr("Anti-miss ATTIVO: se sei investito meno del previsto, distribuisci il "
+                            "residuo del capitale 'minimo' in ~{w} rate settimanali entro {d}.")
+                         .format(w=r["weeks_left"], d=fmt_date(r["window_end"])))
             else:
-                a.append(f"Promemoria anti-miss: dal {r['anti_miss_date']:%d/%m/%Y} valuta il "
-                         f"capitale non investito.")
+                a.append(tr("Promemoria anti-miss: dal {d} valuta il capitale non investito.")
+                         .format(d=fmt_date(r["anti_miss_date"])))
         if plan.pots["dca"] and plan.dca:
             first = plan.dca[0]
             boost = plan.boost_now["total"]
-            a.append(f"DCA: prima rata {first['amount'] * (1 + boost / 100):,.0f} {cur} il "
-                     f"{first['date']:%d/%m/%Y}" + (f" (boost +{boost:.0f}%)" if boost else "")
-                     + ", poi mensile secondo il calendario.")
+            a.append(tr("DCA: prima rata {amt:,.0f} {cur} il {d}").format(
+                amt=first["amount"] * (1 + boost / 100), cur=cur, d=fmt_date(first["date"]))
+                + (tr(" (boost +{b:.0f}%)").format(b=boost) if boost else "")
+                + tr(", poi mensile secondo il calendario."))
         if phase == "bear":
-            a.append("Fase ribassista prima della finestra: preserva il capitale e prepara gli ordini.")
+            a.append(tr("Fase ribassista prima della finestra: preserva il capitale e prepara gli ordini."))
 
     def _warnings(self, plan: Plan) -> None:
         w, s, inp = plan.warnings, plan.situation, plan.inputs
@@ -497,15 +506,15 @@ class Planner:
         groups = self.kb.sources()
         if len(docs) >= 2 and len(groups) == 1:
             w.append(
-                f"Tutti i {len(docs)} documenti provengono dalla stessa fonte "
-                f"({docs[0].source}): nessuna verifica indipendente, rischio di bias di conferma. "
-                "Aggiungi analisi di autori diversi, idealmente con tesi contrarie."
+                tr("Tutti i {n} documenti provengono dalla stessa fonte ({src}): nessuna verifica "
+                   "indipendente, rischio di bias di conferma. Aggiungi analisi di autori diversi, "
+                   "idealmente con tesi contrarie.").format(n=len(docs), src=docs[0].source)
             )
         promo = [d.title for d in docs if any(f.startswith("promozionale") for f in d.flags)]
         if promo:
             w.append(
-                "Documenti con finalità promozionale (portano a canali a pagamento): "
-                + ", ".join(promo) + ". I track record citati sono auto-dichiarati."
+                tr("Documenti con finalità promozionale (portano a canali a pagamento): {docs}. "
+                   "I track record citati sono auto-dichiarati.").format(docs=", ".join(promo))
             )
         ests = plan.bottom_estimates
         if len(ests) >= 2:
@@ -513,34 +522,36 @@ class Planner:
             hi = max(ests, key=lambda e: e["high"])
             if hi["high"] / max(lo["low"], 1) > 1.3:
                 w.append(
-                    f"Le stime del minimo divergono: da {usd(lo['low'])} ({lo['doc_title']}) a "
-                    f"{usd(hi['high'])} ({hi['doc_title']}). Il piano non dipende da un singolo "
-                    "numero, ma la dispersione indica incertezza reale."
+                    tr("Le stime del minimo divergono: da {lo} ({lo_doc}) a {hi} ({hi_doc}). Il piano "
+                       "non dipende da un singolo numero, ma la dispersione indica incertezza reale.")
+                    .format(lo=usd(lo["low"]), lo_doc=lo["doc_title"], hi=usd(hi["high"]),
+                            hi_doc=hi["doc_title"])
                 )
         rng = self.val("cycle.bottom_range")
         if rng and rng["high"] < s["floor"] * 0.9:
             w.append(
-                f"Incoerenza tra modelli: il range di minimo {usd(rng['low'])}–{usd(rng['high'])} "
-                f"implica una rottura del floor power law ({usd(s['floor'])}) di oltre "
-                f"{(1 - rng['high'] / s['floor']) * 100:.0f}%. Uno dei due modelli è sbagliato."
+                tr("Incoerenza tra modelli: il range di minimo {lo}–{hi} implica una rottura del floor "
+                   "power law ({fl}) di oltre {p:.0f}%. Uno dei due modelli è sbagliato.")
+                .format(lo=usd(rng["low"]), hi=usd(rng["high"]), fl=usd(s["floor"]),
+                        p=(1 - rng["high"] / s["floor"]) * 100)
             )
         if "cycle.peak_offset_months" in self.params or plan.pots["dca"]:
-            w.append(
+            w.append(tr(
                 "Il 'ciclo di 4 anni' si basa su 4 osservazioni (2012, 2016, 2020, 2024): "
                 "un campione minimo. ETF e istituzionali possono alterarne tempi e ampiezza."
-            )
+            ))
         if self.val("accum.window"):
-            w.append(
+            w.append(tr(
                 "La data del minimo attesa (ott-nov) è la più osservata dal mercato: lo stesso "
                 "documento avverte che può essere anticipata dagli operatori (front-running)."
-            )
+            ))
         breaches = self.val("power_law.floor_breaches")
         worst = None
         if breaches:
             worst = s["floor"] * (1 - max(breaches) / 100)
             w.append(
-                f"Il floor power law non è un supporto garantito: in passato è stato rotto fino al "
-                f"{max(breaches):.0f}%. Oggi equivarrebbe a circa {usd(worst)}."
+                tr("Il floor power law non è un supporto garantito: in passato è stato rotto fino al "
+                   "{p:.0f}%. Oggi equivarrebbe a circa {worst}.").format(p=max(breaches), worst=usd(worst))
             )
         # Stress test sul prezzo medio d'acquisto stimato della ladder
         spent = [(r["amount"], (r["low"] + r["high"]) / 2 if r["low"] else r["high"] * 0.95)
@@ -550,24 +561,24 @@ class Planner:
             avg = tot / sum(x / p for x, p in spent)
             loss = (worst / avg - 1) * 100
             w.append(
-                f"Stress test: prezzo medio stimato della ladder {usd(avg)}; con BTC a {usd(worst)} "
-                f"la posizione segnerebbe {loss:.0f}%. Assicurati di poterlo sostenere per anni."
+                tr("Stress test: prezzo medio stimato della ladder {avg}; con BTC a {worst} la "
+                   "posizione segnerebbe {loss:.0f}%. Assicurati di poterlo sostenere per anni.")
+                .format(avg=usd(avg), worst=usd(worst), loss=loss)
             )
         hist = self.val("cycle.return_history")
         if hist:
             w.append(
-                "Rendimenti decrescenti ciclo dopo ciclo ("
-                + " → ".join(f"{h:,}%" for h in hist)
-                + "): proiettare il passato sul futuro è un'ipotesi, non un fatto."
+                tr("Rendimenti decrescenti ciclo dopo ciclo ({h}): proiettare il passato sul futuro "
+                   "è un'ipotesi, non un fatto.").format(h=" → ".join(f"{x:,}%" for x in hist))
             )
         if None in (inp.fear_greed, inp.high200, inp.ma200):
-            w.append("Dati di mercato incompleti: alcuni boost/kill-switch non sono valutabili.")
+            w.append(tr("Dati di mercato incompleti: alcuni boost/kill-switch non sono valutabili."))
         if not s["power_law"].calibrated:
-            w.append("Power law non calibrata dai documenti: uso parametri standard (Santostasi).")
-        w.append(
+            w.append(tr("Power law non calibrata dai documenti: uso parametri standard (Santostasi)."))
+        w.append(tr(
             "Il capitale del piano deve essere denaro che puoi tenere fermo 4+ anni, separato dal "
             "fondo di emergenza. Questo software non è consulenza finanziaria."
-        )
+        ))
 
 
 def _short(value: Any) -> str:

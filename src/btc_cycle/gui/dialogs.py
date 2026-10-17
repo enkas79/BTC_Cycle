@@ -42,7 +42,9 @@ di oggi, come indicato dal documento sorgente.</li>
 <h3>4. Grafico</h3>
 <p>La scheda <b>Grafico</b> mostra il prezzo BTC (aggiornato ogni 60 s) con le fasce della ladder,
 fair value e floor della power law, livelli di invalidazione, MA200 e finestra di minimo. La
-casella permette di passare tra scala lineare e logaritmica.</p>
+casella permette di passare tra scala lineare e logaritmica. Con il click sinistro su un punto
+traccia le linee di prezzo e data (l'etichetta mostra lo scarto dal prezzo attuale); con il click
+destro le rimuove.</p>
 
 <h3>5. Leggi le avvertenze</h3>
 <p>La sezione <b>Avvertenze</b> segnala fonti uniche, contenuti promozionali, stime divergenti,

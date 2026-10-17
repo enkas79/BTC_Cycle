@@ -44,7 +44,7 @@ from ..core.market import fetch_market
 from ..core.models import MarketSnapshot
 from ..core.planner import PROFILES, PlanInputs, Planner
 from ..core.report import render_html, render_markdown
-from ..i18n import LANGUAGES, get_lang, tr
+from ..i18n import LANGUAGES, get_lang, tr, tr_label
 from ..paths import data_dir, knowledge_path, read_version
 from .chart_tab import ChartTab
 from .dialogs import HelpDialog, ask_update
@@ -281,7 +281,8 @@ class MainWindow(QMainWindow):
         box = QGroupBox(tr("Strategia"))
         form = QFormLayout(box)
         self.profile = QComboBox()
-        self.profile.addItems(list(PROFILES))
+        for name in PROFILES:
+            self.profile.addItem(tr(name), name)  # il dato resta la chiave italiana usata dal motore
         self.bottom_pct = QDoubleSpinBox()
         self.bottom_pct.setRange(-1, 100)
         self.bottom_pct.setDecimals(0)
@@ -356,7 +357,7 @@ class MainWindow(QMainWindow):
         self.fx.setValue(float(s.value("fx", 1.17)))
         self._currency_changed(self.currency.currentText())
         self.price.setValue(float(s.value("price", 0)))
-        self.profile.setCurrentText(s.value("profile", "bilanciato"))
+        self.profile.setCurrentIndex(max(0, self.profile.findData(s.value("profile", "bilanciato"))))
         self.bottom_pct.setValue(float(s.value("bottom_pct", -1)))
         self.repeg.setChecked(s.value("repeg", "true") in (True, "true"))
         self.slow_drip.setChecked(s.value("slow_drip", "false") in (True, "true"))
@@ -370,7 +371,7 @@ class MainWindow(QMainWindow):
         s = self.settings
         for key, value in [("capital", self.capital.value()), ("currency", self.currency.currentText()),
                            ("fx", self.fx.value()), ("price", self.price.value()),
-                           ("profile", self.profile.currentText()),
+                           ("profile", self.profile.currentData()),
                            ("bottom_pct", self.bottom_pct.value()),
                            ("repeg", self.repeg.isChecked()), ("slow_drip", self.slow_drip.isChecked()),
                            ("fear", self.fear.value()), ("ma200", self.ma200.value()),
@@ -470,8 +471,8 @@ class MainWindow(QMainWindow):
         docs = self.kb.sorted_documents()
         self.docs_table.setRowCount(len(docs))
         for r, d in enumerate(docs):
-            vals = [d.title, self.kb.effective_date(d), d.source, len(d.insights),
-                    "; ".join(d.flags)]
+            vals = [d.title, self.kb.effective_date(d), tr(d.source), len(d.insights),
+                    "; ".join(tr(f) for f in d.flags)]
             for c, v in enumerate(vals):
                 self.docs_table.setItem(r, c, _item(v, align_right=(c == 3)))
         _fit(self.docs_table)
@@ -482,7 +483,7 @@ class MainWindow(QMainWindow):
         for r, p in enumerate(sorted(params.values(), key=lambda x: x.key)):
             conflicts = "; ".join(f"{_fmt(a['value'])} ({a['doc_title']})"
                                   for a in p.alternatives if a["value"] != p.value)
-            for c, v in enumerate([p.label, _fmt(p.value), p.doc_title, p.doc_date or "",
+            for c, v in enumerate([tr_label(p.label), _fmt(p.value), p.doc_title, p.doc_date or "",
                                    conflicts]):
                 cell = _item(v)
                 cell.setToolTip(str(v))
@@ -498,7 +499,7 @@ class MainWindow(QMainWindow):
         ins = docs[row].insights
         self.insights_table.setRowCount(len(ins))
         for r, i in enumerate(ins):
-            for c, v in enumerate([i.category, i.label, _fmt(i.value), i.page, i.evidence]):
+            for c, v in enumerate([i.category, tr_label(i.label), _fmt(i.value), i.page, i.evidence]):
                 cell = _item(v, align_right=(c == 3))
                 cell.setToolTip(i.evidence if c == 4 else _fmt(i.value))
                 self.insights_table.setItem(r, c, cell)
@@ -550,7 +551,7 @@ class MainWindow(QMainWindow):
             currency=self.currency.currentText(),
             usd_per_unit=self.fx.value(),
             today=self.date.date().toPyDate(),
-            profile=self.profile.currentText(),
+            profile=self.profile.currentData(),
             bottom_pot_pct=self.bottom_pct.value() if self.bottom_pct.value() >= 0 else None,
             repeg_ladder=self.repeg.isChecked(),
             slow_drip=self.slow_drip.isChecked(),
