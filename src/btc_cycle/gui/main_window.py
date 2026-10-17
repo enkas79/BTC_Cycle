@@ -95,6 +95,7 @@ class MainWindow(QMainWindow):
         self.plan = None
         self._workers: set = set()
         self._update_busy = False
+        self.guide_dialog: Optional[HelpDialog] = None
         self.settings = QSettings("enkas79", "BTC_Cycle")
 
         self.setWindowTitle(f"{APP_NAME} {self.version}")
@@ -167,7 +168,8 @@ class MainWindow(QMainWindow):
             self._lang_actions[code] = act
 
         m = bar.addMenu(tr("&Aiuto"))
-        self._action(m, tr("Guida"), self.open_guide, "F1")
+        self._action(m, tr("Guida"), self.show_guide, "F1")
+        self._action(m, tr("Guida (PDF)"), self.open_guide)
         self._action(m, tr("Controlla aggiornamenti"), lambda: self.check_updates(manual=True))
         m.addSeparator()
         self._action(m, tr("Informazioni"), self.show_about)
@@ -198,16 +200,22 @@ class MainWindow(QMainWindow):
             act.setChecked(c == code)
 
     def open_guide(self) -> None:
-        """Genera (una volta per versione e lingua) e apre la guida PDF; se fallisce, guida breve."""
+        """Genera (una volta per versione e lingua) e apre la guida PDF con il lettore di sistema."""
         def done(path: str) -> None:
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
                 QMessageBox.information(self, tr("Guida"), tr("Guida salvata in:\n{path}").format(path=path))
 
         def failed(err: str) -> None:
-            self.statusBar().showMessage(tr("Errore: {e}").format(e=err), 6000)
-            HelpDialog(self).exec()
+            QMessageBox.warning(self, tr("Guida"), tr("Errore: {e}").format(e=err))
 
         self._run(build_guide_pdf, get_lang(), ok=done, fail=failed)
+
+    def show_guide(self) -> None:
+        if self.guide_dialog is None:
+            self.guide_dialog = HelpDialog(self.open_guide, self)
+        self.guide_dialog.show()
+        self.guide_dialog.raise_()
+        self.guide_dialog.activateWindow()
 
     def show_tools(self) -> None:
         self.tools.show()

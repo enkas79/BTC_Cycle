@@ -334,7 +334,7 @@ l'inquadratura iniziale.</li>
 Rimuovi documento selezionato, Apri cartella dati.</td></tr>
 <tr><td>Strumenti</td><td>Documenti e parametri…, Lingua (Italiano / English: si applica al prossimo
 avvio).</td></tr>
-<tr><td>Aiuto</td><td>Guida (questo PDF, F1), Controlla aggiornamenti, Informazioni (autore e versione).</td></tr>
+<tr><td>Aiuto</td><td>Guida (finestra con indice e ricerca, F1), Guida (PDF) (questo documento), Controlla aggiornamenti, Informazioni (autore e versione).</td></tr>
 </table>
 <ul>
 <li><b>Lingua:</b> al primo avvio segue la lingua del sistema (italiano se it, altrimenti inglese). Il

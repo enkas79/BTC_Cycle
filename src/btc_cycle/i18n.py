@@ -92,52 +92,6 @@ from .i18n_plan import EN_PLAN  # noqa: E402
 
 EN.update(EN_PLAN)
 
-GUIDE_EN = """
-<h2>{app} — Guide</h2>
-<p>The program reads documents (PDF, TXT, MD) on the Bitcoin cycle, the power law and accumulation
-strategies, extracts their numeric parameters and combines them with market data to generate an
-investment plan.</p>
-
-<h3>1. Import the documents</h3>
-<ul>
-<li><b>File → Import documents…</b> (Ctrl+O), <b>Import folder…</b> or drag the files into the window.</li>
-<li><b>Tools → Documents and parameters…</b> shows, for each file, the source, date, flags (e.g.
-promotional content) and every extracted item with page and text excerpt.</li>
-<li>Documents already imported are recognized (hash) and not duplicated.</li>
-</ul>
-
-<h3>2. Check the parameters</h3>
-<p>The <b>Parameters</b> tab shows the effective strategy: the most recent document wins for each
-parameter; differing values from other documents are flagged as conflicts. If a parameter is
-missing, the plan uses a default declared in the report.</p>
-
-<h3>3. Generate the plan</h3>
-<ul>
-<li>Enter capital, currency and exchange rate, BTC price (or <b>Refresh market data</b>, F5).</li>
-<li>Optional indicators (Fear &amp; Greed, MA200, 200-day high, VIX, cycle closing low) enable boosts,
-the kill-switch and the "new low" rule.</li>
-<li><b>Bottom-window share</b>: part of the capital devoted to ladder + drip + reserve; the rest goes
-into the extended front-loaded DCA.</li>
-<li><b>Re-anchor ladder to floor</b>: shifts the price zones in proportion to today's power-law floor,
-as stated in the source document.</li>
-</ul>
-
-<h3>4. Chart</h3>
-<p>The <b>Chart</b> tab shows the BTC price (refreshed every 60 s) with the ladder bands, the power-law
-fair value and floor, invalidation levels, MA200 and the bottom window. Use the checkbox to switch
-between linear and logarithmic scale. Left-click a point to draw its price and date lines (the label
-shows the difference from the current price); right-click removes them. <b>Show exits</b> extends the chart to the scheduled sales (dates,
-percentages, peak window and stated target). <b>Export image…</b> and <b>Copy</b> save or copy the
-chart (with status and sources) as a PNG for sharing.</p>
-
-<h3>5. Read the warnings</h3>
-<p>The <b>Warnings</b> section flags single sources, promotional content, diverging estimates, small
-statistical samples and a stress test. Do not ignore it.</p>
-
-<p><i>Educational tool: not financial advice.</i></p>
-"""
-
-
 def set_lang(code: str) -> None:
     global _lang
     _lang = code if code in LANGUAGES else "it"

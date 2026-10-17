@@ -7,6 +7,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 @pytest.mark.parametrize("lang", ["it", "en"])
+def test_guide_html_anchors(lang):
+    from btc_cycle.guide import guide_html
+
+    html, titles = guide_html(lang)
+    assert len(titles) == 10
+    assert all(f'<a name="s{i + 1}"></a>' in html for i in range(len(titles)))
+
+
+@pytest.mark.parametrize("lang", ["it", "en"])
 def test_guide_pdf(lang, tmp_path, monkeypatch):
     from PyQt6.QtGui import QGuiApplication
 

@@ -320,7 +320,7 @@ buttons), ready to share. Enlarge the window for a sharper image.</li>
 selected document, Open data folder.</td></tr>
 <tr><td>Tools</td><td>Documents and parameters…, Language (Italiano / English: applied on the next
 start).</td></tr>
-<tr><td>Help</td><td>Guide (this PDF, F1), Check for updates, About (author and version).</td></tr>
+<tr><td>Help</td><td>Guide (window with index and search, F1), Guide (PDF) (this document), Check for updates, About (author and version).</td></tr>
 </table>
 <ul>
 <li><b>Language:</b> on first start it follows the system language (Italian if it, otherwise English). The
