@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import List, Optional, Sequence, Tuple
 
+from ..i18n import tr
 from .planner import Plan
 
 # Rally falliti dei bear market dal 2011: picco mediano sopra il minimo (15 casi).
@@ -50,7 +51,7 @@ def build_overlays(plan: Plan, start: date, end: date, step_days: int = 7) -> Ch
     out = ChartOverlays()
     for r in plan.ladder:
         rng = f"< {_k(r['high'])}" if r["low"] <= 0 else f"{_k(r['low'])}–{_k(r['high'])}"
-        out.levels.append(HLevel(f"Ladder {r['rung']} · {rng} · {r['pct']}%",
+        out.levels.append(HLevel(tr("Ladder {n} · {rng} · {pct}%").format(n=r["rung"], rng=rng, pct=r["pct"]),
                                  r["low"], r["high"], "ladder"))
     for lv in plan.levels:
         out.levels.append(HLevel(f"{lv['name']} · {_k(lv['price'])}", lv["price"], lv["price"],
@@ -58,9 +59,9 @@ def build_overlays(plan: Plan, start: date, end: date, step_days: int = 7) -> Ch
     if inp.ma200:
         out.levels.append(HLevel(f"MA200 · {_k(inp.ma200)}", inp.ma200, inp.ma200, "ma200"))
     if s.get("window_start") and s.get("window_end"):
-        out.windows.append(VWindow("Finestra di minimo", s["window_start"], s["window_end"], "window"))
+        out.windows.append(VWindow(tr("Finestra di minimo"), s["window_start"], s["window_end"], "window"))
     if s.get("est_bottom"):
-        out.windows.append(VWindow("Minimo stimato", s["est_bottom"], s["est_bottom"], "bottom"))
+        out.windows.append(VWindow(tr("Minimo stimato"), s["est_bottom"], s["est_bottom"], "bottom"))
     pl = s.get("power_law")
     if pl:
         d = start

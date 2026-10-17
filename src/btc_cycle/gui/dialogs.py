@@ -5,6 +5,7 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextBrowser, QVBoxLayout
 
 from .. import APP_NAME
+from ..i18n import GUIDE_EN, get_lang, tr
 from ..updater import ReleaseInfo
 
 GUIDE_HTML = f"""
@@ -17,13 +18,13 @@ piano di investimento.</p>
 <ul>
 <li><b>File → Importa documenti…</b> (Ctrl+O), <b>Importa cartella…</b> oppure trascina i file
 nella finestra.</li>
-<li>La scheda <b>Documenti</b> mostra, per ogni file, la fonte, la data, i flag (es. contenuto
+<li><b>Strumenti → Documenti e parametri…</b> mostra, per ogni file, la fonte, la data, i flag (es. contenuto
 promozionale) e ogni informazione estratta con pagina e frammento di testo.</li>
 <li>I documenti già importati vengono riconosciuti (hash) e non duplicati.</li>
 </ul>
 
 <h3>2. Controlla i parametri</h3>
-<p>La scheda <b>Parametri</b> mostra la strategia effettiva: per ogni parametro vince il
+<p>La scheda <b>Parametri</b> (in Strumenti) mostra la strategia effettiva: per ogni parametro vince il
 documento più recente; i valori diversi di altri documenti sono segnalati come conflitti.
 Se un parametro manca, il piano usa un valore predefinito dichiarato nel report.</p>
 
@@ -38,7 +39,12 @@ resto va nel DCA esteso front-loaded.</li>
 di oggi, come indicato dal documento sorgente.</li>
 </ul>
 
-<h3>4. Leggi le avvertenze</h3>
+<h3>4. Grafico</h3>
+<p>La scheda <b>Grafico</b> mostra il prezzo BTC (aggiornato ogni 60 s) con le fasce della ladder,
+fair value e floor della power law, livelli di invalidazione, MA200 e finestra di minimo. La
+casella permette di passare tra scala lineare e logaritmica.</p>
+
+<h3>5. Leggi le avvertenze</h3>
 <p>La sezione <b>Avvertenze</b> segnala fonti uniche, contenuti promozionali, stime divergenti,
 campioni statistici ridotti e uno stress test. Non ignorarla.</p>
 
@@ -53,11 +59,11 @@ cambia <code>EXTRACTOR_VERSION</code> i documenti salvati vengono rianalizzati a
 class HelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Guida — {APP_NAME}")
+        self.setWindowTitle(tr("Guida — {app}").format(app=APP_NAME))
         self.resize(640, 620)
         layout = QVBoxLayout(self)
         browser = QTextBrowser()
-        browser.setHtml(GUIDE_HTML)
+        browser.setHtml(GUIDE_EN.format(app=APP_NAME) if get_lang() == "en" else GUIDE_HTML)
         layout.addWidget(browser)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
@@ -67,9 +73,9 @@ class HelpDialog(QDialog):
 def ask_update(parent, release: ReleaseInfo, local_version: str) -> bool:
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Icon.Information)
-    box.setWindowTitle("Aggiornamento disponibile")
-    box.setText(f"È disponibile la versione {release.version} (installata: {local_version}).\n"
-                "Vuoi scaricarla e installarla ora?")
+    box.setWindowTitle(tr("Aggiornamento disponibile"))
+    box.setText(tr("È disponibile la versione {new} (installata: {old}).\n"
+                   "Vuoi scaricarla e installarla ora?").format(new=release.version, old=local_version))
     if release.notes:
         box.setDetailedText(release.notes)
     box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)

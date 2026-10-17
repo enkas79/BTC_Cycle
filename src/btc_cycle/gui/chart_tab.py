@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime, time, timedelta
 from typing import Callable, List, Optional, Tuple
 
 import pyqtgraph as pg
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QSettings, QTimer
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ..core.chart import FAILED_RALLY_MEDIAN_PCT, build_overlays, nearest_zone, rally_from_low
 from ..core.market import fetch_history, fetch_spot
 from ..core.planner import Plan, usd
+from ..i18n import tr
 from .style import ACCENT_DARK, INK
 
 POLL_MS = 60_000  # CoinGecko gratuito: ~30 chiamate/min, 1/min è ampiamente nei limiti
@@ -50,19 +52,23 @@ class ChartTab(QWidget):
         self.plot.setMenuEnabled(False)
         self.plot.getAxis("left").setLabel("USD")
 
-        self.info = QLabel("Genera un piano per vedere livelli e finestre della strategia.")
+        self.info = QLabel(tr("Genera un piano per vedere livelli e finestre della strategia."))
         self.info.setObjectName("hint")
         self.info.setWordWrap(True)
         self.sources = QLabel()
         self.sources.setObjectName("hint")
         self.sources.setWordWrap(True)
-        refresh = QPushButton("Aggiorna storico")
+        refresh = QPushButton(tr("Aggiorna storico"))
         refresh.clicked.connect(self.load_history)
-        reset = QPushButton("Reimposta vista")
+        reset = QPushButton(tr("Reimposta vista"))
         reset.clicked.connect(lambda: self._redraw(reset_view=True))
 
+        self.log_box = QCheckBox(tr("Scala logaritmica"))
+        self.log_box.setChecked(str(QSettings("enkas79", "BTC_Cycle").value("chart_log", "false")) == "true")
+        self.log_box.toggled.connect(self._toggle_log)
         top = QHBoxLayout()
         top.addWidget(self.info, 1)
+        top.addWidget(self.log_box)
         top.addWidget(reset)
         top.addWidget(refresh)
         layout = QVBoxLayout(self)
@@ -77,8 +83,8 @@ class ChartTab(QWidget):
     # ------------------------------------------------------------------ dati
     def set_plan(self, plan: Plan) -> None:
         self.plan = plan
-        self.sources.setText("Fonti: " + "; ".join(plan.documents) +
-                             ". Livelli e finestre sono stime di terzi, non previsioni.")
+        self.sources.setText(tr("Fonti: {docs}. Livelli e finestre sono stime di terzi, non previsioni.")
+                             .format(docs="; ".join(plan.documents)))
         self._redraw(reset_view=True)
         if not self.history:
             self.load_history()
@@ -87,14 +93,14 @@ class ChartTab(QWidget):
         if self._busy:
             return
         self._busy = True
-        self._status = "Download storico…"
+        self._status = tr("Download storico…")
         self._update_info()
 
         def done(rows) -> None:
             self._busy = False
             self.history = rows
             self.spot = rows[-1][1] if rows else self.spot
-            self._status = f"storico aggiornato {datetime.now():%H:%M:%S}"
+            self._status = tr("storico aggiornato {t}").format(t=f"{datetime.now():%H:%M:%S}")
             self._redraw(reset_view=True)
 
         self._run(fetch_history, ok=done, fail=self._failed)
@@ -107,37 +113,46 @@ class ChartTab(QWidget):
         def done(price: float) -> None:
             self._busy = False
             self.spot = price
-            self._status = f"live {datetime.now():%H:%M:%S}"
+            self._status = tr("live {t}").format(t=f"{datetime.now():%H:%M:%S}")
             self._redraw(reset_view=False)
 
         self._run(fetch_spot, ok=done, fail=self._failed)
 
     def _failed(self, err: str) -> None:
         self._busy = False
-        self._status = f"errore di rete ({err})"
+        self._status = tr("errore di rete ({err})").format(err=err)
         self._update_info()
 
     # --------------------------------------------------------------- disegno
     def _update_info(self) -> None:
         if not self.spot:
-            self.info.setText(self._status or "In attesa dei dati di mercato…")
+            self.info.setText(self._status or tr("In attesa dei dati di mercato…"))
             return
         parts = [f"<b>BTC {usd(self.spot)}</b>"]
         if self.plan:
             near = nearest_zone(self.plan, self.spot)
             if near:
-                parts.append("dentro la ladder " + str(near[0]) if near[1] == 0 else
-                             f"gradino {near[0]} della ladder: {near[1]:+.1f}%")
+                parts.append(tr("dentro la ladder {n}").format(n=near[0]) if near[1] == 0 else
+                             tr("gradino {n} della ladder: {d:+.1f}%").format(n=near[0], d=near[1]))
         rally = rally_from_low([c for _, c in self.history], self.spot)
         if rally:
-            parts.append(f"rally dal minimo {usd(rally[0])}: {rally[1]:+.0f}% (mediana rally falliti "
-                         f"+{FAILED_RALLY_MEDIAN_PCT:.0f}%, 15 casi, solo contesto)")
+            parts.append(tr("rally dal minimo {low}: {pct:+.0f}% (mediana rally falliti +{med:.0f}%, "
+                            "15 casi, solo contesto)").format(low=usd(rally[0]), pct=rally[1],
+                                                              med=FAILED_RALLY_MEDIAN_PCT))
         parts.append(self._status)
         self.info.setText(" · ".join(p for p in parts if p))
 
+    def _y(self, v: float) -> float:
+        """Le posizioni degli oggetti del grafico sono in log10 quando la scala è logaritmica."""
+        return math.log10(v) if self.log_box.isChecked() else v
+
+    def _toggle_log(self, checked: bool) -> None:
+        QSettings("enkas79", "BTC_Cycle").setValue("chart_log", checked)
+        self._redraw(reset_view=True)
+
     def _label(self, text: str, x: float, y: float, color: str) -> None:
         item = pg.TextItem(text, color=color, anchor=(0, 1))
-        item.setPos(x, y)
+        item.setPos(x, self._y(y))
         self.plot.addItem(item, ignoreBounds=True)
 
     def _redraw(self, reset_view: bool) -> None:
@@ -146,6 +161,7 @@ class ChartTab(QWidget):
             return
         plot = self.plot
         plot.clear()
+        plot.setLogMode(x=False, y=self.log_box.isChecked())
         xs, ys = [h[0] for h in self.history], [h[1] for h in self.history]
         today = date.today()
         x_end = _ts(today + timedelta(days=FUTURE_DAYS))
@@ -165,8 +181,8 @@ class ChartTab(QWidget):
             lows += [lv.low for lv in ov.levels if lv.low > 0]
             highs += [lv.high for lv in ov.levels]
             ymin, ymax = min(lows) * 0.85, max(highs) * 1.1
-            for name, curve, color in (("Fair value power law", ov.fair_curve, LEVEL_COLORS["fair"]),
-                                       ("Floor power law", ov.floor_curve, LEVEL_COLORS["floor"])):
+            for name, curve, color in ((tr("Fair value power law"), ov.fair_curve, LEVEL_COLORS["fair"]),
+                                       (tr("Floor power law"), ov.floor_curve, LEVEL_COLORS["floor"])):
                 if curve:
                     plot.addItem(pg.PlotDataItem([_ts(d) for d, _ in curve], [v for _, v in curve],
                                                  pen=_pen(color, 1, dash=True)), ignoreBounds=True)
@@ -181,26 +197,28 @@ class ChartTab(QWidget):
                     plot.addItem(pg.LinearRegionItem((_ts(w.start), _ts(w.end)), orientation="vertical",
                                                      movable=False, brush=brush, pen=_pen(ACCENT_DARK)),
                                  ignoreBounds=True)
-                self._label(w.label, _ts(w.start), ymax * 0.97, ACCENT_DARK)
+                self._label(w.label, _ts(w.start), ymax * 0.9, ACCENT_DARK)
             floor_y = ymin
             for lv in ov.levels:
                 if lv.kind == "ladder":
                     lo = lv.low if lv.low > 0 else floor_y
-                    plot.addItem(pg.LinearRegionItem((lo, lv.high), orientation="horizontal",
-                                                     movable=False, brush=pg.mkBrush("#2e7d3233"),
-                                                     pen=_pen("#2e7d32")), ignoreBounds=True)
+                    plot.addItem(pg.LinearRegionItem((self._y(lo), self._y(lv.high)),
+                                                     orientation="horizontal", movable=False,
+                                                     brush=pg.mkBrush("#2e7d3233"), pen=_pen("#2e7d32")),
+                                 ignoreBounds=True)
                     self._label(lv.label, x0, lv.high, "#1b5e20")
                 else:
                     color = LEVEL_COLORS.get(lv.kind, INK)
-                    plot.addItem(pg.InfiniteLine(lv.high, angle=0, pen=_pen(color, 1, True)),
+                    plot.addItem(pg.InfiniteLine(self._y(lv.high), angle=0, pen=_pen(color, 1, True)),
                                  ignoreBounds=True)
                     self._label(lv.label, x0, lv.high, color)
 
         if self.spot:
-            plot.addItem(pg.InfiniteLine(self.spot, angle=0, pen=_pen("#f7931a", 2)), ignoreBounds=True)
-            self._label(f"Prezzo {usd(self.spot)}", xs[-1], self.spot, ACCENT_DARK)
+            plot.addItem(pg.InfiniteLine(self._y(self.spot), angle=0, pen=_pen("#f7931a", 2)),
+                         ignoreBounds=True)
+            self._label(tr("Prezzo {p}").format(p=usd(self.spot)), xs[-1], self.spot, ACCENT_DARK)
 
         if reset_view:
             ymin, ymax = min(lows) * 0.85, max(highs) * 1.1
             plot.setXRange(x0, x_end if self.plan else xs[-1] + 30 * 86400, padding=0)
-            plot.setYRange(ymin, ymax, padding=0)
+            plot.setYRange(self._y(ymin), self._y(ymax), padding=0)
