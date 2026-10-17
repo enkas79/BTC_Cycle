@@ -1,4 +1,4 @@
-"""Finestra principale: documenti, parametri, piano; menu e aggiornamenti."""
+"""Finestra principale: piano e grafico; documenti/parametri in Strumenti; menu e aggiornamenti."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDateEdit,
+    QDialog,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -44,6 +45,7 @@ from ..core.models import MarketSnapshot
 from ..core.planner import PROFILES, PlanInputs, Planner
 from ..core.report import render_html, render_markdown
 from ..paths import data_dir, knowledge_path, read_version
+from .chart_tab import ChartTab
 from .dialogs import HelpDialog, ask_update
 from .workers import TaskWorker
 
@@ -153,6 +155,9 @@ class MainWindow(QMainWindow):
         self._action(m, "Apri cartella dati", lambda: QDesktopServices.openUrl(
             QUrl.fromLocalFile(str(data_dir()))))
 
+        m = bar.addMenu("&Strumenti")
+        self._action(m, "Documenti e parametri…", self.show_tools)
+
         m = bar.addMenu("&Aiuto")
         self._action(m, "Guida", lambda: HelpDialog(self).exec(), "F1")
         self._action(m, "Controlla aggiornamenti", lambda: self.check_updates(manual=True))
@@ -163,11 +168,22 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_plan_tab(), "Piano")
-        self.tabs.addTab(self._build_docs_tab(), "Documenti")
-        self.tabs.addTab(self._build_params_tab(), "Parametri")
+        self.chart_tab = ChartTab(self._run)
+        self.tabs.addTab(self.chart_tab, "Grafico")
         self.setCentralWidget(self.tabs)
+        self.tools = QDialog(self)
+        self.tools.setWindowTitle("Documenti e parametri")
+        self.tools.resize(1000, 640)
+        tool_tabs = QTabWidget()
+        tool_tabs.addTab(self._build_docs_tab(), "Documenti")
+        tool_tabs.addTab(self._build_params_tab(), "Parametri")
+        QVBoxLayout(self.tools).addWidget(tool_tabs)
         self.kb_label = QLabel()
         self.statusBar().addPermanentWidget(self.kb_label)
+
+    def show_tools(self) -> None:
+        self.tools.show()
+        self.tools.raise_()
 
     def _build_docs_tab(self) -> QWidget:
         w = QWidget()
@@ -530,7 +546,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Piano", str(exc))
             return
         self.report.setHtml(render_html(self.plan))
-        self.tabs.setCurrentIndex(0)
+        self.chart_tab.set_plan(self.plan)
+        if not silent:
+            self.tabs.setCurrentIndex(0)
         self._save_settings()
         self.statusBar().showMessage("Piano generato.", 4000)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import urllib.request
-from typing import Any, List
+from typing import Any, List, Tuple
 
 from .models import MarketSnapshot
 
@@ -53,3 +53,14 @@ def fetch_market() -> MarketSnapshot:
     except Exception as exc:
         snap.errors.append(f"fear & greed: {exc}")
     return snap
+
+
+def fetch_spot() -> float:
+    """Prezzo BTC/USD corrente (leggero: adatto al polling)."""
+    return float(_get_json(f"{COINGECKO}/simple/price?ids=bitcoin&vs_currencies=usd")["bitcoin"]["usd"])
+
+
+def fetch_history(days: int = 365) -> List[Tuple[float, float]]:
+    """Chiusure giornaliere come (timestamp in secondi, prezzo USD)."""
+    data = _get_json(f"{COINGECKO}/coins/bitcoin/market_chart?vs_currency=usd&days={days}&interval=daily")
+    return [(p[0] / 1000.0, float(p[1])) for p in data["prices"]]
