@@ -44,6 +44,7 @@ from ..core.market import fetch_market
 from ..core.models import MarketSnapshot
 from ..core.planner import PROFILES, PlanInputs, Planner
 from ..core.report import render_html, render_markdown
+from ..guide import build_guide_pdf
 from ..i18n import LANGUAGES, get_lang, tr, tr_label
 from ..paths import data_dir, knowledge_path, read_version
 from .chart_tab import ChartTab
@@ -166,7 +167,7 @@ class MainWindow(QMainWindow):
             self._lang_actions[code] = act
 
         m = bar.addMenu(tr("&Aiuto"))
-        self._action(m, tr("Guida"), lambda: HelpDialog(self).exec(), "F1")
+        self._action(m, tr("Guida"), self.open_guide, "F1")
         self._action(m, tr("Controlla aggiornamenti"), lambda: self.check_updates(manual=True))
         m.addSeparator()
         self._action(m, tr("Informazioni"), self.show_about)
@@ -195,6 +196,18 @@ class MainWindow(QMainWindow):
                                 tr("La lingua cambierà al prossimo avvio dell'applicazione."))
         for c, act in self._lang_actions.items():
             act.setChecked(c == code)
+
+    def open_guide(self) -> None:
+        """Genera (una volta per versione e lingua) e apre la guida PDF; se fallisce, guida breve."""
+        def done(path: str) -> None:
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
+                QMessageBox.information(self, tr("Guida"), tr("Guida salvata in:\n{path}").format(path=path))
+
+        def failed(err: str) -> None:
+            self.statusBar().showMessage(tr("Errore: {e}").format(e=err), 6000)
+            HelpDialog(self).exec()
+
+        self._run(build_guide_pdf, get_lang(), ok=done, fail=failed)
 
     def show_tools(self) -> None:
         self.tools.show()

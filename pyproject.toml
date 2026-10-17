@@ -14,6 +14,7 @@ target-version = "py39"
 
 [tool.ruff.lint.per-file-ignores]
 "src/btc_cycle/i18n*.py" = ["E501"]  # tabelle di traduzioni
+"src/btc_cycle/guide_*.py" = ["E501"]  # testo della guida
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]

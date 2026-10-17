@@ -181,6 +181,7 @@ EN_PLAN = {
     "Obiettivo di picco · {p}": "Peak target · {p}",
     "Mostra uscite": "Show exits", "Esporta immagine…": "Export image…", "Copia": "Copy",
     "Grafico copiato negli appunti.": "Chart copied to the clipboard.",
+    "Guida salvata in:\n{path}": "Guide saved to:\n{path}",
     "prudente": "prudent", "bilanciato": "balanced", "aggressivo": "aggressive",
     "Allocazione iniziale": "Initial allocation", "Boost se -X% dal massimo 200gg": "Boost if -X% from 200-day high",
     "Boost se Fear & Greed sotto X": "Boost if Fear & Greed below X", "Boost se VIX sopra X": "Boost if VIX above X",

@@ -22,6 +22,8 @@ Applicazione desktop (Python + PyQt6) che analizza documenti sul ciclo di Bitcoi
   esporta o copia come PNG.
 - **Lingua** italiano/inglese (Strumenti → Lingua, applicata al riavvio). Anche piano ed export sono
   tradotti (date in formato aaaa-mm-gg in inglese).
+- **Guida PDF** completa (Aiuto → Guida, F1), in italiano o inglese: campi, voci del piano, grafico,
+  glossario e risoluzione dei problemi.
 - Esporta il piano in HTML o Markdown. Autoupdate da GitHub Releases.
 
 ## Sviluppo
