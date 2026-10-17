@@ -141,6 +141,11 @@ simulate other dates.</td></tr>
 <tr><td>Profile</td><td><b>Prudent</b>: 40% of capital in the «bottom window», no altcoins/ETH. <b>Balanced</b>:
 50%, up to 20% altcoins and 10% ETH. <b>Aggressive</b>: 60%, up to 30% altcoins and 20% ETH. The effective
 limits are the lower of the profile and the documents.</td></tr>
+<tr><td>Power law model</td><td><b>Fit on historical data</b> (default): fair value and floor are recomputed each
+time with a regression on the daily prices since 2011 (exponent, coefficient and floor are estimated from the
+data, using only the data up to the analysis date). <b>From the documents</b>: the PDFs' fixed parameters
+(standard exponent 5.82, floor ≈ 42% of fair value, anchors given by the author). If the history is not available
+the documents are used. The fit also shifts the ladder zones when «Re-anchor» is on.</td></tr>
 <tr><td>Bottom-window share</td><td>Percentage of capital devoted to ladder + drip + reserve (the «bottom
 window»). «From profile» uses the profile's value. The rest goes to the extended DCA.</td></tr>
 <tr><td>Re-anchor ladder to current floor</td><td>The ladder's price zones are written for a power-law floor
@@ -199,6 +204,7 @@ current price from it).</td></tr>
 price's percentage distance (negative = below).</td></tr>
 <tr><td>Power law floor</td><td>The model's lower band (normally about 42% of fair value) and the price's
 distance. It is not guaranteed support.</td></tr>
+<tr><td>Power law model</td><td>Origin of the parameters: fit on historical data (with exponent, R² and the percentile used for the floor) or the documents' parameters.</td></tr>
 <tr><td>Next halving</td><td>(Estimated) date of the next halving, basis of the exit plan.</td></tr>
 </table>
 <h3>6.3 Capital allocation</h3>
@@ -301,6 +307,11 @@ the median failed rally (+35%, 15 cases: context only), update status.</td></tr>
 <ul>
 <li><b>Logarithmic scale:</b> on a log scale equal distances represent equal percentage changes; it is the right
 scale for comparing different cycles. The axes show powers of 10 (e.g. 9·10⁴ = 90,000).</li>
+<li><b>View:</b> «Price and levels» (default) or <b>«Overlaid cycles»</b>: the 2012, 2016, 2020 and 2024 cycles' prices divided
+by the price on the halving day, on a log scale and by days since the halving. It shows whether the current cycle
+(orange) behaves like the previous ones; with 4 samples it remains a qualitative comparison. The vertical lines are
+the plan's estimated peak and low.</li>
+<li><b>Show entries:</b> shows/hides the ladder bands (the entries).</li>
 <li><b>Show exits:</b> extends the axis to the scheduled sales. It shows the vertical lines «Sell 25% · 75% left»,
 the <b>peak window</b> and the stated <b>peak target</b>. Exits are by date, not by price: the prices are only
 estimates (target and scenarios).</li>
@@ -330,8 +341,8 @@ is available, asks whether to download and install it. The manual check is in <i
 updates</i>.</li>
 <li><b>Saved data:</b> the knowledge base (documents and parameters) and the settings (capital, currency,
 profile, indicators, chart preferences) stay on your computer. <i>Data → Open data folder</i> opens the
-folder; nothing is sent to external servers, except the requests to CoinGecko, alternative.me and
-GitHub.</li>
+folder; nothing is sent to external servers, except the requests to CoinGecko, alternative.me, blockchain.com (full price history, cached and refreshed
+daily) and GitHub.</li>
 </ul>
 
 <h2>9. Glossary</h2>
@@ -343,6 +354,8 @@ GitHub.</li>
 4 cycles.</td></tr>
 <tr><td>Power law</td><td>Model linking price to the days since the genesis block (3 January 2009): price = A ×
 days^B (standard exponent 5.82).</td></tr>
+<tr><td>Fit / R²</td><td>Fitting the power law to the data with a regression on logarithms. R² measures how closely the curve follows past prices; on trending series it is always high and does not prove predictive power.</td></tr>
+<tr><td>Residual percentile</td><td>The fit's floor is the level below which the price fell on only 2.5% of days (deviation from the curve).</td></tr>
 <tr><td>Fair value / floor</td><td>The model's central value / lower band (normally ~42% of fair value).</td></tr>
 <tr><td>Drawdown</td><td>Percentage decline from the previous high.</td></tr>
 <tr><td>DCA</td><td>Dollar-cost averaging: periodic purchases of a fixed amount.</td></tr>

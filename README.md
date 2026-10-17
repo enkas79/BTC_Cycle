@@ -22,6 +22,9 @@ Applicazione desktop (Python + PyQt6) che analizza documenti sul ciclo di Bitcoi
   esporta o copia come PNG.
 - **Lingua** italiano/inglese (Strumenti → Lingua, applicata al riavvio). Anche piano ed export sono
   tradotti (date in formato aaaa-mm-gg in inglese).
+- **Power law adattata ai dati**: fair value e floor sono un fit sullo storico completo del prezzo (dal 2011,
+  fonte blockchain.com, cache locale), non parametri fissi; i parametri dei documenti restano selezionabili.
+  Vista «Cicli sovrapposti» (2012/2016/2020/2024) e interruttore per le linee di ingresso.
 - **Guida** completa in finestra, con indice e ricerca (Aiuto → Guida, F1) e in PDF (Guida (PDF)), in
   italiano o inglese: campi, voci del piano, grafico,
   glossario e risoluzione dei problemi.
