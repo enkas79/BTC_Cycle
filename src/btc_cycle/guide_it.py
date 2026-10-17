@@ -147,6 +147,11 @@ puoi simulare altre date.</td></tr>
 <tr><td>Profilo</td><td><b>Prudente</b>: 40% del capitale nella «finestra di minimo», nessuna altcoin/ETH.
 <b>Bilanciato</b>: 50%, fino al 20% altcoin e 10% ETH. <b>Aggressivo</b>: 60%, fino al 30% altcoin e 20% ETH.
 I limiti effettivi sono il minore tra profilo e documenti.</td></tr>
+<tr><td>Modello power law</td><td><b>Fit sullo storico</b> (predefinito): fair value e floor sono ricalcolati ogni
+volta con una regressione sui prezzi giornalieri dal 2011 (esponente, coefficiente e floor sono stimati dai
+dati, usando solo quelli fino alla data di analisi). <b>Dai documenti</b>: parametri fissi dei PDF (esponente
+standard 5,82, floor ≈ 42% del fair value, ancore indicate dall'autore). Se lo storico non è disponibile si
+usano i documenti. Il fit sposta anche le zone della ladder, se «Riancora» è attivo.</td></tr>
 <tr><td>Quota finestra minimo</td><td>Percentuale del capitale dedicata a ladder + drip + riserva
 (la «finestra di minimo»). «Da profilo» usa il valore del profilo. Il resto va nel DCA esteso.</td></tr>
 <tr><td>Riancora ladder al floor attuale</td><td>Le zone di prezzo della ladder sono scritte per un
@@ -206,6 +211,7 @@ del prezzo attuale rispetto ad esso).</td></tr>
 distanza percentuale del prezzo (negativa = sotto).</td></tr>
 <tr><td>Floor power law</td><td>Banda inferiore del modello (di norma circa il 42% del fair value) e
 distanza del prezzo. Non è un supporto garantito.</td></tr>
+<tr><td>Modello power law</td><td>Origine dei parametri: fit sullo storico (con esponente, R² e percentile usato per il floor) oppure parametri dei documenti.</td></tr>
 <tr><td>Prossimo halving</td><td>Data (stimata) del prossimo dimezzamento, base del piano di uscita.</td></tr>
 </table>
 <h3>6.3 Ripartizione del capitale</h3>
@@ -314,6 +320,11 @@ dell'aggiornamento.</td></tr>
 <ul>
 <li><b>Scala logaritmica:</b> in scala log distanze uguali rappresentano variazioni percentuali uguali;
 è la scala adatta per confrontare cicli diversi. Gli assi mostrano potenze di 10 (es. 9·10⁴ = 90.000).</li>
+<li><b>Vista:</b> «Prezzo e livelli» (predefinita) oppure <b>«Cicli sovrapposti»</b>: i prezzi dei cicli 2012, 2016, 2020 e
+2024 divisi per il prezzo del giorno dell'halving, in scala logaritmica e per giorni trascorsi dall'halving. Permette
+di vedere se il ciclo in corso (arancione) si comporta come i precedenti; con 4 campioni resta un confronto
+qualitativo. Le linee verticali sono il picco e il minimo stimati dal piano.</li>
+<li><b>Mostra ingressi:</b> mostra/nasconde le fasce della ladder (gli ingressi).</li>
 <li><b>Mostra uscite:</b> estende l'asse fino alle vendite programmate. Mostra le linee verticali
 «Vendi 25% · resta 75%», la <b>finestra di picco</b> e l'<b>obiettivo di picco</b> dichiarato. Le uscite sono
 a data, non a prezzo: i prezzi sono solo stime (obiettivo e scenari).</li>
@@ -345,7 +356,7 @@ in <i>Aiuto → Controlla aggiornamenti</i>.</li>
 <li><b>Dati salvati:</b> la knowledge base (documenti e parametri) e le impostazioni (capitale, valuta,
 profilo, indicatori, preferenze del grafico) restano sul tuo computer. <i>Dati → Apri cartella dati</i>
 apre la cartella; non viene inviato nulla a server esterni, salvo le richieste a CoinGecko,
-alternative.me e GitHub.</li>
+alternative.me, blockchain.com (storico completo dei prezzi, salvato in cache e aggiornato ogni giorno) e GitHub.</li>
 </ul>
 
 <h2>9. Glossario</h2>
@@ -357,6 +368,8 @@ Date: 2012, 2016, 2020, 2024; prossimo stimato aprile 2028. «H+18» = 18 mesi d
 su 4 soli cicli.</td></tr>
 <tr><td>Power law</td><td>Modello che lega il prezzo ai giorni dal blocco genesi (3 gennaio 2009):
 prezzo = A × giorni^B (esponente standard 5,82).</td></tr>
+<tr><td>Fit / R²</td><td>Adattamento della legge di potenza ai dati con una regressione sui logaritmi. R² misura quanto la curva segue i prezzi passati; su serie con trend è sempre alto e non prova capacità predittiva.</td></tr>
+<tr><td>Percentile dei residui</td><td>Il floor del fit è il livello sotto cui il prezzo è sceso solo nel 2,5% dei giorni (scostamento dalla curva).</td></tr>
 <tr><td>Fair value / floor</td><td>Valore centrale del modello / banda inferiore (di norma ~42% del fair value).</td></tr>
 <tr><td>Drawdown</td><td>Calo percentuale dal massimo precedente.</td></tr>
 <tr><td>DCA</td><td>Dollar-cost averaging: acquisti periodici di importo prefissato.</td></tr>

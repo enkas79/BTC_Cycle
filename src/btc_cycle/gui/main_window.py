@@ -39,6 +39,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import APP_AUTHOR, APP_NAME, GITHUB_REPO, updater
+from ..core.history import load_history
 from ..core.knowledge import KnowledgeBase, import_files, reanalyzed_copy
 from ..core.market import fetch_market
 from ..core.models import MarketSnapshot
@@ -46,7 +47,7 @@ from ..core.planner import PROFILES, PlanInputs, Planner
 from ..core.report import render_html, render_markdown
 from ..guide import build_guide_pdf
 from ..i18n import LANGUAGES, get_lang, tr, tr_label
-from ..paths import data_dir, knowledge_path, read_version
+from ..paths import data_dir, history_path, knowledge_path, read_version
 from .chart_tab import ChartTab
 from .dialogs import HelpDialog, ask_update
 from .workers import TaskWorker
@@ -93,6 +94,7 @@ class MainWindow(QMainWindow):
         self.version = read_version()
         self.kb = KnowledgeBase()
         self.plan = None
+        self.history: List = []  # storico completo del prezzo (dal 2010), per fit e cicli
         self._workers: set = set()
         self._update_busy = False
         self.guide_dialog: Optional[HelpDialog] = None
@@ -108,6 +110,9 @@ class MainWindow(QMainWindow):
 
         self._run(KnowledgeBase.load, knowledge_path(), ok=self._on_kb_loaded,
                   fail=lambda e: self._on_kb_loaded(KnowledgeBase(), e))
+        self._run(load_history, history_path(), ok=self._on_history,
+                  fail=lambda e: self.statusBar().showMessage(
+                      tr("Storico completo non disponibile: {e}").format(e=e), 8000))
         QTimer.singleShot(3000, lambda: self.check_updates(manual=False))
 
     # ------------------------------------------------------------------ worker
@@ -309,9 +314,13 @@ class MainWindow(QMainWindow):
         self.bottom_pct.setDecimals(0)
         self.bottom_pct.setSuffix(" %")
         self.bottom_pct.setSpecialValueText(tr("da profilo"))
+        self.pl_mode = QComboBox()
+        self.pl_mode.addItem(tr("Fit sullo storico"), "fit")
+        self.pl_mode.addItem(tr("Dai documenti"), "docs")
         self.repeg = QCheckBox(tr("Riancora ladder al floor attuale"))
         self.slow_drip = QCheckBox(tr("Drip lento (metà)"))
         form.addRow(tr("Profilo"), self.profile)
+        form.addRow(tr("Modello power law"), self.pl_mode)
         form.addRow(tr("Quota finestra minimo"), self.bottom_pct)
         form.addRow(self.repeg)
         form.addRow(self.slow_drip)
@@ -380,6 +389,7 @@ class MainWindow(QMainWindow):
         self.price.setValue(float(s.value("price", 0)))
         self.profile.setCurrentIndex(max(0, self.profile.findData(s.value("profile", "bilanciato"))))
         self.bottom_pct.setValue(float(s.value("bottom_pct", -1)))
+        self.pl_mode.setCurrentIndex(max(0, self.pl_mode.findData(s.value("pl_mode", "fit"))))
         self.repeg.setChecked(s.value("repeg", "true") in (True, "true"))
         self.slow_drip.setChecked(s.value("slow_drip", "false") in (True, "true"))
         self.fear.setValue(int(s.value("fear", -1)))
@@ -392,7 +402,7 @@ class MainWindow(QMainWindow):
         s = self.settings
         for key, value in [("capital", self.capital.value()), ("currency", self.currency.currentText()),
                            ("fx", self.fx.value()), ("price", self.price.value()),
-                           ("profile", self.profile.currentData()),
+                           ("profile", self.profile.currentData()), ("pl_mode", self.pl_mode.currentData()),
                            ("bottom_pct", self.bottom_pct.value()),
                            ("repeg", self.repeg.isChecked()), ("slow_drip", self.slow_drip.isChecked()),
                            ("fear", self.fear.value()), ("ma200", self.ma200.value()),
@@ -414,6 +424,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(tr("Pronto."), 4000)
         if self.price.value() > 0 and self.kb.documents:
             self.generate_plan()
+
+    def _on_history(self, rows) -> None:
+        self.history = rows
+        self.chart_tab.set_full_history(rows)
+        if self.price.value() > 0 and self.kb.documents:
+            self.generate_plan(silent=True)  # il fit power law dipende dallo storico
 
     def import_dialog(self) -> None:
         files, _ = QFileDialog.getOpenFileNames(
@@ -573,6 +589,7 @@ class MainWindow(QMainWindow):
             usd_per_unit=self.fx.value(),
             today=self.date.date().toPyDate(),
             profile=self.profile.currentData(),
+            pl_mode=self.pl_mode.currentData(),
             bottom_pot_pct=self.bottom_pct.value() if self.bottom_pct.value() >= 0 else None,
             repeg_ladder=self.repeg.isChecked(),
             slow_drip=self.slow_drip.isChecked(),
@@ -585,7 +602,7 @@ class MainWindow(QMainWindow):
 
     def generate_plan(self, silent: bool = False) -> None:
         try:
-            self.plan = Planner(self.kb).build(self._inputs())
+            self.plan = Planner(self.kb, self.history).build(self._inputs())
         except ValueError as exc:
             if not silent:
                 QMessageBox.warning(self, tr("Piano"), str(exc))

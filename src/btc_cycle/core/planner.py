@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..i18n import fmt_date, tr
 from . import cycle as cy
 from .knowledge import KnowledgeBase
+from .powerlaw_fit import fit_power_law
 
 # Valori usati quando nessun documento fornisce il parametro
 DEFAULTS: Dict[str, Any] = {
@@ -62,6 +63,7 @@ class PlanInputs:
     high200: Optional[float] = None
     vix: Optional[float] = None
     cycle_low_close: Optional[float] = None
+    pl_mode: str = "fit"  # "fit" = power law adattata allo storico, "docs" = parametri dei documenti
 
 
 @dataclass
@@ -99,8 +101,9 @@ def pct(v: Optional[float], sign: bool = True) -> str:
 
 
 class Planner:
-    def __init__(self, kb: KnowledgeBase):
+    def __init__(self, kb: KnowledgeBase, history=None):
         self.kb = kb
+        self.history = history or []
         self.params = kb.effective_params()
 
     # --- accesso ai parametri con tracciamento della fonte ---
@@ -208,6 +211,11 @@ class Planner:
             mid = (floor["low"] + floor["high"]) / 2
             pl.calibrate_floor(mid, date.fromisoformat(floor["date"]))
             self._track(plan, "Floor power law", "power_law.floor")
+        s["pl_source"], s["pl_docs"] = "docs", pl
+        if inp.pl_mode == "fit":
+            fit = fit_power_law(self.history, as_of=today)
+            if fit:  # senza storico sufficiente si ripiega sui documenti
+                pl, s["pl_fit"], s["pl_source"] = fit.to_model(), fit, "fit"
         s["power_law"] = pl
         s["fair"], s["floor"] = pl.fair_value(today), pl.floor(today)
         s["vs_fair"] = (price / s["fair"] - 1) * 100
@@ -573,7 +581,20 @@ class Planner:
             )
         if None in (inp.fear_greed, inp.high200, inp.ma200):
             w.append(tr("Dati di mercato incompleti: alcuni boost/kill-switch non sono valutabili."))
-        if not s["power_law"].calibrated:
+        if s["pl_source"] == "fit":
+            fit = s["pl_fit"]
+            w.append(tr("Il fit power law usa {n} giorni di storico (R² {r2:.2f}): un R² alto su serie con "
+                        "trend è atteso e non prova capacità predittiva; il floor è il {q:.1f}° percentile "
+                        "storico dei residui, non un limite garantito.").format(
+                n=fit.n, r2=fit.r2, q=fit.quantile * 100))
+            docs = s["pl_docs"]
+            if docs.calibrated:
+                gap = (s["floor"] / docs.floor(inp.today) - 1) * 100
+                if abs(gap) > 15:
+                    w.append(tr("Floor dal fit sullo storico {fit} contro {docs} dai documenti "
+                                "({gap:+.0f}%): i parametri fissi dei documenti non seguono i dati.").format(
+                        fit=usd(s["floor"]), docs=usd(docs.floor(inp.today)), gap=gap))
+        elif not s["power_law"].calibrated:
             w.append(tr("Power law non calibrata dai documenti: uso parametri standard (Santostasi)."))
         w.append(tr(
             "Il capitale del piano deve essere denaro che puoi tenere fermo 4+ anni, separato dal "

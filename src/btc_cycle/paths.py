@@ -36,5 +36,9 @@ def data_dir() -> Path:
     return path
 
 
+def history_path() -> Path:
+    return data_dir() / "price_history.json"
+
+
 def knowledge_path() -> Path:
     return data_dir() / "knowledge.json"

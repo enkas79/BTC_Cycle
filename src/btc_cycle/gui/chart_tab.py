@@ -12,16 +12,19 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from ..core.chart import FAILED_RALLY_MEDIAN_PCT, build_overlays, nearest_zone, rally_from_low
+from ..core.cycles import cycle_series
 from ..core.market import fetch_history, fetch_spot
 from ..core.planner import Plan, usd
 from ..i18n import fmt_date, tr
@@ -52,6 +55,7 @@ class ChartTab(QWidget):
         self._run = run
         self.plan: Optional[Plan] = None
         self.history: List[Tuple[float, float]] = []
+        self.full_history: List[Tuple[float, float]] = []  # dal 2010, per i cicli sovrapposti
         self.spot: Optional[float] = None
         self._click: Optional[Tuple[float, float]] = None  # (timestamp, prezzo) del punto cliccato
         self._busy = False
@@ -63,6 +67,15 @@ class ChartTab(QWidget):
         self.plot.setMenuEnabled(False)
         self.plot.getAxis("left").setLabel("USD")
         self.plot.scene().sigMouseClicked.connect(self._on_click)
+
+        self.cycle_plot = pg.PlotWidget()
+        self.cycle_plot.showGrid(x=True, y=True, alpha=0.15)
+        self.cycle_plot.setMenuEnabled(False)
+        self.cycle_plot.getAxis("bottom").setLabel(tr("giorni dall'halving"))
+        self.cycle_plot.getAxis("left").setLabel(tr("prezzo / prezzo all'halving"))
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.plot)
+        self.stack.addWidget(self.cycle_plot)
 
         self.info = QLabel(tr("Genera un piano per vedere livelli e finestre della strategia."))
         self.info.setObjectName("hint")
@@ -82,12 +95,21 @@ class ChartTab(QWidget):
         saved = QSettings("enkas79", "BTC_Cycle").value("chart_exits", "false")
         self.exit_box.setChecked(str(saved) == "true")
         self.exit_box.toggled.connect(self._toggle_exits)
+        self.entry_box = QCheckBox(tr("Mostra ingressi"))
+        saved_entries = QSettings("enkas79", "BTC_Cycle").value("chart_entries", "true")
+        self.entry_box.setChecked(str(saved_entries) == "true")
+        self.entry_box.toggled.connect(self._toggle_entries)
+        self.view_box = QComboBox()
+        self.view_box.addItem(tr("Prezzo e livelli"), "price")
+        self.view_box.addItem(tr("Cicli sovrapposti"), "cycles")
+        self.view_box.currentIndexChanged.connect(self._view_changed)
         save = QPushButton(tr("Esporta immagine…"))
         save.clicked.connect(self.export_image)
         copy = QPushButton(tr("Copia"))
         copy.clicked.connect(self.copy_image)
         top = QHBoxLayout()
-        for w in (self.log_box, self.exit_box):
+        top.addWidget(self.view_box)
+        for w in (self.log_box, self.entry_box, self.exit_box):
             top.addWidget(w)
         top.addStretch(1)
         for w in (reset, refresh, save, copy):
@@ -98,7 +120,7 @@ class ChartTab(QWidget):
         self.canvas.setStyleSheet("background: #ffffff;")
         inner = QVBoxLayout(self.canvas)
         inner.addWidget(self.info)
-        inner.addWidget(self.plot, 1)
+        inner.addWidget(self.stack, 1)
         inner.addWidget(self.sources)
         layout = QVBoxLayout(self)
         layout.addLayout(top)
@@ -213,6 +235,54 @@ class ChartTab(QWidget):
         x_min, x_max = self.plot.getPlotItem().vb.viewRange()[0]
         self._label(text, x, price, "#6a1b9a", right=x > (x_min + x_max) / 2)
 
+    def set_full_history(self, rows: List[Tuple[float, float]]) -> None:
+        self.full_history = rows
+        if self.view_box.currentData() == "cycles":
+            self._redraw(reset_view=True)
+
+    def _toggle_entries(self, checked: bool) -> None:
+        QSettings("enkas79", "BTC_Cycle").setValue("chart_entries", checked)
+        self._redraw(reset_view=True)
+
+    def _view_changed(self) -> None:
+        cycles = self.view_box.currentData() == "cycles"
+        self.stack.setCurrentWidget(self.cycle_plot if cycles else self.plot)
+        for w in (self.log_box, self.entry_box, self.exit_box):
+            w.setEnabled(not cycles)
+        self._redraw(reset_view=True)
+
+    def _draw_cycles(self) -> None:
+        """Cicli a confronto: prezzo / prezzo all'halving (scala log) per giorni dall'halving."""
+        plot = self.cycle_plot
+        plot.clear()
+        if plot.plotItem.legend is not None:
+            plot.plotItem.legend.clear()
+        else:
+            plot.addLegend(offset=(10, 10))
+        plot.setLogMode(x=False, y=True)
+        series = cycle_series(self.full_history)
+        if not series:
+            self.info.setText(tr("Storico completo non ancora disponibile."))
+            return
+        self.info.setText(tr("Prezzo normalizzato al giorno dell'halving (=1). I cicli passati non "
+                             "garantiscono quello attuale: 4 campioni, rendimenti decrescenti."))
+        colors = ["#6b7280", "#1565c0", "#6a1b9a"]
+        last = max(series)
+        for i, (h, rows) in enumerate(sorted(series.items())):
+            current = h == last
+            pen = _pen("#f7931a", 3) if current else _pen(colors[i % len(colors)], 2)
+            name = tr("Ciclo {y}").format(y=h.year) + (" · " + tr("in corso") if current else "")
+            plot.addItem(pg.PlotDataItem([r[0] for r in rows], [r[1] for r in rows], pen=pen, name=name))
+        if self.plan:
+            s = self.plan.situation
+            for key, label in (("est_peak", tr("Picco stimato")), ("est_bottom", tr("Minimo stimato"))):
+                if s.get(key) and s.get("last_halving"):
+                    x = (s[key] - s["last_halving"]).days
+                    opts = {"position": 0.95, "color": ACCENT_DARK}
+                    plot.addItem(pg.InfiniteLine(x, angle=90, pen=_pen(ACCENT_DARK, 1, True),
+                                                 label=label, labelOpts=opts))
+        plot.enableAutoRange()
+
     def _toggle_exits(self, checked: bool) -> None:
         QSettings("enkas79", "BTC_Cycle").setValue("chart_exits", checked)
         self._redraw(reset_view=True)
@@ -242,6 +312,9 @@ class ChartTab(QWidget):
         self.plot.addItem(item, ignoreBounds=True)
 
     def _redraw(self, reset_view: bool) -> None:
+        if self.view_box.currentData() == "cycles":
+            self._draw_cycles()
+            return
         self._update_info()
         if not self.history:
             return
@@ -294,6 +367,8 @@ class ChartTab(QWidget):
                 self._draw_exits(ov, ymax)
             for lv in ov.levels:
                 if lv.kind == "ladder":
+                    if not self.entry_box.isChecked():
+                        continue
                     lo = lv.low if lv.low > 0 else floor_y
                     plot.addItem(pg.LinearRegionItem((self._y(lo), self._y(lv.high)),
                                                      orientation="horizontal", movable=False,

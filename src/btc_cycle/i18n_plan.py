@@ -183,6 +183,23 @@ EN_PLAN = {
     "Grafico copiato negli appunti.": "Chart copied to the clipboard.",
     "Guida salvata in:\n{path}": "Guide saved to:\n{path}",
     "Cerca nella guida…": "Search the guide…", "Apri PDF": "Open PDF", "Guida (PDF)": "Guide (PDF)",
+    "Modello power law": "Power law model",
+    "Fit sullo storico: esponente {b:.2f}, R² {r2:.3f}, floor = {q:.1f}° percentile dei residui":
+        "Fit on historical data: exponent {b:.2f}, R² {r2:.3f}, floor = {q:.1f}th percentile of residuals",
+    "Dai documenti (esponente {b:.2f})": "From the documents (exponent {b:.2f})",
+    "Il fit power law usa {n} giorni di storico (R² {r2:.2f}): un R² alto su serie con trend è atteso e non prova capacità predittiva; il floor è il {q:.1f}° percentile storico dei residui, non un limite garantito.":
+        "The power-law fit uses {n} days of history (R² {r2:.2f}): a high R² on trending series is expected and does not prove predictive power; the floor is the {q:.1f}th historical percentile of the residuals, not a guaranteed limit.",
+    "Floor dal fit sullo storico {fit} contro {docs} dai documenti ({gap:+.0f}%): i parametri fissi dei documenti non seguono i dati.":
+        "Floor from the historical fit {fit} versus {docs} from the documents ({gap:+.0f}%): the documents' fixed parameters do not follow the data.",
+    "Mostra ingressi": "Show entries", "Prezzo e livelli": "Price and levels",
+    "Cicli sovrapposti": "Overlaid cycles", "Fit sullo storico": "Fit on historical data",
+    "Dai documenti": "From the documents",
+    "Storico completo non disponibile: {e}": "Full history not available: {e}",
+    "Storico completo non ancora disponibile.": "Full history not available yet.",
+    "giorni dall'halving": "days since halving", "prezzo / prezzo all'halving": "price / price at halving",
+    "Ciclo {y}": "Cycle {y}", "in corso": "current", "Picco stimato": "Estimated peak",
+    "Prezzo normalizzato al giorno dell'halving (=1). I cicli passati non garantiscono quello attuale: 4 campioni, rendimenti decrescenti.":
+        "Price normalized to the halving day (=1). Past cycles do not guarantee the current one: 4 samples, diminishing returns.",
     "prudente": "prudent", "bilanciato": "balanced", "aggressivo": "aggressive",
     "Allocazione iniziale": "Initial allocation", "Boost se -X% dal massimo 200gg": "Boost if -X% from 200-day high",
     "Boost se Fear & Greed sotto X": "Boost if Fear & Greed below X", "Boost se VIX sopra X": "Boost if VIX above X",

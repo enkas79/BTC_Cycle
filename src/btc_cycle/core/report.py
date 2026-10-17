@@ -38,6 +38,11 @@ def build_sections(plan: Plan) -> List[Tuple[str, List[Block]]]:
     rows += [
         [tr("Fair value power law"), tr("{v} (prezzo {p})").format(v=usd(s["fair"]), p=pct(s["vs_fair"]))],
         [tr("Floor power law"), tr("{v} (prezzo {p})").format(v=usd(s["floor"]), p=pct(s["vs_floor"]))],
+        [tr("Modello power law"), (
+            tr("Fit sullo storico: esponente {b:.2f}, R² {r2:.3f}, floor = {q:.1f}° percentile dei residui")
+            .format(b=s["pl_fit"].exponent, r2=s["pl_fit"].r2, q=s["pl_fit"].quantile * 100)
+            if s["pl_source"] == "fit" else tr("Dai documenti (esponente {b:.2f})").format(
+                b=s["power_law"].exponent))],
         [tr("Prossimo halving"), _d(s["next_halving"])],
     ]
     sections.append((tr("Situazione di mercato e ciclo"),
