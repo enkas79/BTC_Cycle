@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from datetime import date, timedelta
 from typing import Any, List, Tuple
 
 from ..i18n import fmt_date, tr, tr_label
@@ -47,6 +48,43 @@ def build_sections(plan: Plan) -> List[Tuple[str, List[Block]]]:
     ]
     sections.append((tr("Situazione di mercato e ciclo"),
                      [("table", [tr("Voce"), tr("Valore")], rows)]))
+
+    study = s.get("recovery_study")
+    if study:
+        cases = study.value["cases"]
+        candidate = study.value["candidate"]
+        headers = [tr("Traguardo"), *(case["low"][:4] for case in cases)]
+        notes = [tr("Fonte: {source}. Giorni osservati dopo tre minimi intraday individuati a posteriori.")
+                 .format(source=study.doc_title)]
+        anchor = date.fromisoformat(candidate["date"]) if candidate else None
+        if anchor:
+            headers.append(tr("Date se il minimo candidato fosse definitivo"))
+            notes.append(tr("Il documento indica come minimo candidato {date} ({price}). "
+                            "Le date illustrano i ritardi osservati nei tre casi e non stimano probabilità.")
+                         .format(date=_d(anchor), price=usd(candidate["price"])))
+            if candidate.get("ma200_checkpoint"):
+                notes.append(tr("Per il minimo candidato, lo studio registra la 30ª chiusura sopra "
+                                "MA200 il {signal} e la perdita della media il {loss}. Il monitoraggio "
+                                "a 90 giorni era incompleto alla data dello studio.")
+                             .format(signal=_d(date.fromisoformat(candidate["ma200_checkpoint"])),
+                                     loss=_d(date.fromisoformat(candidate["ma200_loss"]))))
+        recovery_rows = []
+        for key, label in (
+            ("rebound_days", "Prima chiusura a +50%"),
+            ("double_days", "Prima chiusura a +100%"),
+            ("ma200_days", "30 chiusure consecutive sopra MA200"),
+            ("reclaim_days", "Prima chiusura sopra il precedente massimo"),
+        ):
+            if key not in cases[0]:
+                continue
+            days = [case[key] for case in cases]
+            row = [tr(label), *(str(day) for day in days)]
+            if anchor:
+                start, end = (anchor + timedelta(days=n) for n in (min(days), max(days)))
+                row.append(f"{_d(start)} – {_d(end)}")
+            recovery_rows.append(row)
+        sections.append((tr("Tempi storici di ripresa dal minimo"),
+                         [("p", note) for note in notes] + [("table", headers, recovery_rows)]))
 
     p = plan.pots
     blocks: List[Block] = [("table", [tr("Quota"), tr("Importo")], [

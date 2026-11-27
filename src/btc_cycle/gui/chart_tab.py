@@ -47,6 +47,13 @@ def _pen(color: str, width: int = 1, dash: bool = False):
     return pen
 
 
+class _DollarAxis(pg.AxisItem):
+    def tickStrings(self, values: List[float], scale: float, spacing: float) -> List[str]:
+        if self.logMode:
+            return [usd(10.0 ** value * scale) for value in values]
+        return [usd(value * scale) for value in values]
+
+
 class ChartTab(QWidget):
     """``run`` è il lancio-worker della finestra: nessuna rete nel thread GUI."""
 
@@ -62,10 +69,12 @@ class ChartTab(QWidget):
         self._status = ""
 
         pg.setConfigOptions(antialias=True, background="w", foreground=INK)
-        self.plot = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem()})
+        price_axis = _DollarAxis("left")
+        price_axis.enableAutoSIPrefix(False)
+        price_axis.setLabel("USD")
+        self.plot = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem(), "left": price_axis})
         self.plot.showGrid(x=True, y=True, alpha=0.15)
         self.plot.setMenuEnabled(False)
-        self.plot.getAxis("left").setLabel("USD")
         self.plot.scene().sigMouseClicked.connect(self._on_click)
 
         self.cycle_plot = pg.PlotWidget()

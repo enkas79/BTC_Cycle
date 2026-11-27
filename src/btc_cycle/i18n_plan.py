@@ -25,6 +25,19 @@ EN_PLAN = {
         "Generated on {d} · profile {p} · not financial advice",
     "Cosa fare adesso": "What to do now", "Nessuna azione.": "No action.",
     "Situazione di mercato e ciclo": "Market and cycle situation", "Voce": "Item",
+    "Tempi storici di ripresa dal minimo": "Historical recovery times from the low",
+    "Traguardo": "Milestone",
+    "Fonte: {source}. Giorni osservati dopo tre minimi intraday individuati a posteriori.":
+        "Source: {source}. Days observed after three intraday lows identified in hindsight.",
+    "Date se il minimo candidato fosse definitivo": "Dates if the candidate low were final",
+    "Il documento indica come minimo candidato {date} ({price}). Le date illustrano i ritardi osservati nei tre casi e non stimano probabilità.":
+        "The study identifies {date} ({price}) as a candidate low. The dates illustrate the delays observed in the three cases and do not estimate probabilities.",
+    "Per il minimo candidato, lo studio registra la 30ª chiusura sopra MA200 il {signal} e la perdita della media il {loss}. Il monitoraggio a 90 giorni era incompleto alla data dello studio.":
+        "For the candidate low, the study records the 30th close above the 200-day MA on {signal} and the loss of the average on {loss}. The 90-day follow-up was incomplete as of the study date.",
+    "Prima chiusura a +50%": "First close at +50%",
+    "Prima chiusura a +100%": "First close at +100%",
+    "30 chiusure consecutive sopra MA200": "30 consecutive closes above the 200-day MA",
+    "Prima chiusura sopra il precedente massimo": "First close above the prior high",
     "Data analisi": "Analysis date", "Prezzo BTC": "BTC price", "Ultimo halving": "Last halving",
     "{d} ({days} giorni, {m:.1f} mesi)": "{d} ({days} days, {m:.1f} months)",
     "Fase del ciclo": "Cycle phase", "Minimo stimato (H+offset)": "Estimated low (H+offset)",

@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .models import Insight
 
-EXTRACTOR_VERSION = 1
+EXTRACTOR_VERSION = 2
 
 MONTHS = {
     m: i
@@ -320,6 +320,38 @@ def extract_cycle(c: Corpus, ctx: Ctx) -> List[Insight]:
     return out
 
 
+def extract_recovery(c: Corpus, ctx: Ctx) -> List[Insight]:
+    table = c.search(r"FINAL LOW FIRST \+50% CLOSE FIRST DOUBLE OLD HIGH RECLAIMED"
+                     r"((?: \d{4}-\d{2}-\d{2}(?: \d+ days){3}){3})(?! \d{4}-)")
+    if not table:
+        return []
+    cases = []
+    for low, rebound, double, reclaim in re.findall(
+        r"(\d{4}-\d{2}-\d{2}) (\d+) days (\d+) days (\d+) days", table.group(1)
+    ):
+        cases.append({"low": low, "rebound_days": int(rebound), "double_days": int(double),
+                      "reclaim_days": int(reclaim)})
+
+    checks = c.search(r"DAYS AFTER FINAL LOW ((?:20\d{2} ){3}).*?"
+                      r"30 closes above 200-day MA (\d+) (\d+) (\d+)\b")
+    if checks and checks.group(1).split() == [case["low"][:4] for case in cases]:
+        for case, days in zip(cases, checks.groups()[1:]):
+            case["ma200_days"] = int(days)
+
+    candidate = c.search(rf"Candidate low ({MONTH_RE} \d{{1,2}}, \d{{4}}) at {MONEY_RE}")
+    low_date = parse_date_text(candidate.group(1)) if candidate else None
+    study = {"cases": cases, "candidate": None}
+    if candidate and low_date:
+        snapshot = {"date": low_date, "price": parse_money(candidate.group(2), candidate.group(3))}
+        checkpoint = c.search(rf"(\d{{4}}-\d{{2}}-\d{{2}}) {low_date} (\d{{4}}-\d{{2}}-\d{{2}}) "
+                              r"Follow-up incomplete")
+        if checkpoint:
+            snapshot.update(ma200_checkpoint=checkpoint.group(1), ma200_loss=checkpoint.group(2))
+        study["candidate"] = snapshot
+    return [_ins(c, table, "statistiche", "recovery.study", study,
+                 "Tempi storici di ripresa dal minimo")]
+
+
 def extract_power_law(c: Corpus, ctx: Ctx) -> List[Insight]:
     out: List[Insight] = []
     m = c.search(
@@ -570,6 +602,7 @@ def extract_generic_levels(c: Corpus, ctx: Ctx) -> List[Insight]:
 
 EXTRACTORS: List[Callable[[Corpus, Ctx], List[Insight]]] = [
     extract_cycle,
+    extract_recovery,
     extract_power_law,
     extract_accumulation,
     extract_dca,

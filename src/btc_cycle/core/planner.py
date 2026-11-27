@@ -171,6 +171,7 @@ class Planner:
                  est_peak=cy.add_months(lh, peak_off), est_bottom=cy.add_months(lh, bottom_off),
                  accumulation_start=cy.add_months(lh, acc[0]),
                  accumulation_end=cy.add_months(lh, acc[1]))
+        s["recovery_study"] = self.params.get("recovery.study")
 
         # Finestra di minimo: dal documento se presente, altrimenti H+bottom±3 mesi
         window = self.val("accum.window")
